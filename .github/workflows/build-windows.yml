@@ -36,6 +36,10 @@ jobs:
           if ($actual -ne $expected) { throw "Source archive SHA-256 mismatch." }
           Expand-Archive -Path .\source.reconstructed.zip -DestinationPath .\build-src -Force
           Copy-Item .\overrides\GlobalUsings.cs .\build-src\GenshinAccountSwitcher\GlobalUsings.cs -Force
+          $xamlPath = '.\build-src\GenshinAccountSwitcher\Views\MainWindow.xaml'
+          $xaml = Get-Content $xamlPath -Raw
+          $xaml = $xaml.Replace('Text="{Binding CurrentUid}"', 'Text="{Binding CurrentUid, Mode=OneWay}"')
+          Set-Content -Path $xamlPath -Value $xaml -Encoding utf8
           Get-ChildItem .\build-src\GenshinAccountSwitcher | Select-Object Name
 
       - name: Restore
