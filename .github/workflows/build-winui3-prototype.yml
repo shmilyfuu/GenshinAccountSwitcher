@@ -29,7 +29,19 @@ jobs:
           $b64 = Get-Content .\winui3-prototype\source.b64 -Raw
           [IO.File]::WriteAllBytes('.\prototype-source.zip', [Convert]::FromBase64String(($b64 -replace '\s','')))
           Expand-Archive .\prototype-source.zip .\prototype-src -Force
+
+          # Unpackaged WinUI 3 is a desktop app. Remove the UWP application-type markers
+          # from the hand-written minimal vcxproj while retaining UseWinUI + WindowsPackageType=None.
+          $proj = '.\prototype-src\GenshinSwitcherWinUI3Prototype.vcxproj'
+          $xml = Get-Content $proj -Raw
+          $xml = $xml.Replace('    <ApplicationType>Windows Store</ApplicationType>' + "`r`n", '')
+          $xml = $xml.Replace('    <ApplicationTypeRevision>10.0</ApplicationTypeRevision>' + "`r`n", '')
+          $xml = $xml.Replace('    <ApplicationType>Windows Store</ApplicationType>' + "`n", '')
+          $xml = $xml.Replace('    <ApplicationTypeRevision>10.0</ApplicationTypeRevision>' + "`n", '')
+          [IO.File]::WriteAllText((Resolve-Path $proj), $xml, [Text.UTF8Encoding]::new($false))
+
           Get-ChildItem .\prototype-src | Format-Table Name,Length
+          Select-String -Path $proj -Pattern 'ApplicationType|UseWinUI|WindowsPackageType'
 
       - name: Restore and build x64 Release
         shell: pwsh
