@@ -1,0 +1,91 @@
+--- a/main.cpp
++++ b/main.cpp
+@@ -6,13 +6,17 @@
+ #include <winrt/Microsoft.UI.Windowing.h>
+ #include <winrt/Microsoft.UI.Xaml.h>
+ #include <winrt/Microsoft.UI.Xaml.Controls.h>
++#include <winrt/Microsoft.UI.Xaml.Controls.Primitives.h>
+ #include <winrt/Microsoft.UI.Xaml.Media.h>
+ #include <winrt/Microsoft.UI.Xaml.Shapes.h>
+ #include <winrt/Microsoft.UI.Xaml.Input.h>
+ #include <winrt/Microsoft.UI.Xaml.Markup.h>
+ #include <winrt/Microsoft.UI.Xaml.Media.Animation.h>
++#include <winrt/Microsoft.UI.Xaml.XamlTypeInfo.h>
+ #include <winrt/Windows.Foundation.h>
++#include <winrt/Windows.Foundation.Collections.h>
+ #include <winrt/Windows.UI.h>
++#include <winrt/Windows.UI.Xaml.Interop.h>
+ #include <winrt/Windows.UI.Text.h>
+ #include <winrt/Windows.Graphics.h>
+ 
+@@ -26,6 +30,9 @@
+ using namespace Microsoft::UI::Xaml::Controls;
+ using namespace Microsoft::UI::Xaml::Media;
+ using namespace Microsoft::UI::Xaml::Shapes;
++using namespace Microsoft::UI::Xaml::Markup;
++using namespace Microsoft::UI::Xaml::XamlTypeInfo;
++using namespace Windows::UI::Xaml::Interop;
+ using namespace Windows::UI;
+ using namespace Windows::UI::Text;
+ 
+@@ -56,18 +63,13 @@
+         bool current;
+     };
+ 
+-    class PrototypeApp : public ApplicationT<PrototypeApp>
++    class PrototypeApp : public ApplicationT<PrototypeApp, IXamlMetadataProvider>
+     {
+     public:
+-        PrototypeApp()
+-        {
+-            ResourceDictionary resources;
+-            resources.MergedDictionaries().Append(XamlControlsResources());
+-            Resources(resources);
+-        }
+-
+         void OnLaunched(LaunchActivatedEventArgs const&)
+         {
++            Resources().MergedDictionaries().Append(XamlControlsResources());
++
+             m_window = Window();
+             m_window.Title(L"原神账号切换器 · WinUI 3 UI 原型");
+ 
+@@ -87,6 +89,21 @@
+             catch (...) {}
+         }
+ 
++        IXamlType GetXamlType(TypeName const& type)
++        {
++            return m_xamlProvider.GetXamlType(type);
++        }
++
++        IXamlType GetXamlType(hstring const& fullname)
++        {
++            return m_xamlProvider.GetXamlType(fullname);
++        }
++
++        com_array<XmlnsDefinition> GetXmlnsDefinitions()
++        {
++            return m_xamlProvider.GetXmlnsDefinitions();
++        }
++
+     private:
+         UIElement BuildRoot()
+         {
+@@ -347,7 +364,7 @@
+             grid.ColumnDefinitions().Append(uidCol);
+             grid.ColumnDefinitions().Append(tagCol);
+ 
+-            Rectangle bar;
++            winrt::Microsoft::UI::Xaml::Shapes::Rectangle bar;
+             bar.RadiusX(2);
+             bar.RadiusY(2);
+             bar.Margin(T(0, 8, 0, 8));
+@@ -432,6 +449,7 @@
+             m_info.IsOpen(true);
+         }
+ 
++        XamlControlsXamlMetaDataProvider m_xamlProvider;
+         Window m_window{ nullptr };
+         StackPanel m_accountStack{ nullptr };
+         InfoBar m_info{ nullptr };
