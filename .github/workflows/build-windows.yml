@@ -35,6 +35,7 @@ jobs:
           Write-Host "Source archive SHA-256: $actual"
           if ($actual -ne $expected) { throw "Source archive SHA-256 mismatch." }
           Expand-Archive -Path .\source.reconstructed.zip -DestinationPath .\build-src -Force
+          Copy-Item .\overrides\GlobalUsings.cs .\build-src\GenshinAccountSwitcher\GlobalUsings.cs -Force
           Get-ChildItem .\build-src\GenshinAccountSwitcher | Select-Object Name
 
       - name: Restore
