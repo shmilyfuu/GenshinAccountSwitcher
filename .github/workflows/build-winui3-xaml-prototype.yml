@@ -23,23 +23,24 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
-      - name: Reconstruct source and enable PRI tooling
+      - name: Reconstruct official-baseline source
         shell: pwsh
         run: |
           $b64 = Get-Content .\winui3-xaml-prototype\source-v3.b64 -Raw
           [IO.File]::WriteAllBytes('.\xaml-source.zip', [Convert]::FromBase64String(($b64 -replace '\s','')))
           Expand-Archive .\xaml-source.zip .\xaml-src -Force
-          $proj = '.\xaml-src\GenshinSwitcherXamlPrototype.vcxproj'
-          $text = Get-Content $proj -Raw
-          $text = $text.Replace('<EnableMsixTooling>false</EnableMsixTooling>', '<EnableMsixTooling>true</EnableMsixTooling>')
-          Set-Content $proj $text -Encoding utf8
-          Select-String -Path $proj -Pattern 'EnableMsixTooling|AppxPackage|WindowsPackageType|AppxPriInitialPath|PRIResource'
+          Copy-Item .\winui3-xaml-prototype\GenshinSwitcherXamlPrototype.1.7.official.vcxproj .\xaml-src\GenshinSwitcherXamlPrototype.vcxproj -Force
+          Copy-Item .\winui3-xaml-prototype\App.1.7.xaml .\xaml-src\App.xaml -Force
+          Copy-Item .\winui3-xaml-prototype\MainWindow.1.7.xaml .\xaml-src\MainWindow.xaml -Force
+          Copy-Item .\winui3-xaml-prototype\MainWindow.1.7.xaml.h .\xaml-src\MainWindow.xaml.h -Force
+          Copy-Item .\winui3-xaml-prototype\MainWindow.1.7.xaml.cpp .\xaml-src\MainWindow.xaml.cpp -Force
+          Select-String -Path .\xaml-src\GenshinSwitcherXamlPrototype.vcxproj -Pattern 'WindowsAppSDK.1.7|EnableMsixTooling|WindowsAppSDKSelfContained|AppxPriInitialPath|PRIResource'
 
       - name: Restore native packages
         shell: pwsh
         working-directory: .\xaml-src
         run: |
-          nuget install Microsoft.WindowsAppSDK -Version 1.8.260710003 -OutputDirectory .\packages -DependencyVersion Highest -NonInteractive
+          nuget install Microsoft.WindowsAppSDK -Version 1.7.260224002 -OutputDirectory .\packages -NonInteractive
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           nuget install Microsoft.Windows.CppWinRT -Version 3.0.260715.1 -OutputDirectory .\packages -NonInteractive
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -58,25 +59,35 @@ jobs:
         run: |
           Get-ChildItem .\xaml-src\dist -File | Sort-Object Length -Descending | Format-Table Name,Length
           if (!(Test-Path .\xaml-src\dist\GenshinSwitcherXamlPrototype.exe)) { throw 'EXE missing' }
-          $pri = Get-ChildItem .\xaml-src\dist -Filter '*.pri' -File -ErrorAction SilentlyContinue
-          if (!$pri) { throw 'PRI resource index missing' }
-          Write-Host "PRI resource index: $($pri.Name)"
+          $pri = @(Get-ChildItem .\xaml-src\dist -Filter '*.pri' -File -ErrorAction SilentlyContinue)
+          if ($pri.Count -eq 0) { throw 'PRI resource index missing' }
+          Write-Host "PRI resource index: $($pri.Name -join ', ')"
+          if (!(Test-Path .\xaml-src\dist\resources.pri)) {
+            Copy-Item $pri[0].FullName .\xaml-src\dist\resources.pri -Force
+            Write-Host "Also created resources.pri compatibility copy."
+          }
           $total = (Get-ChildItem .\xaml-src\dist -File | Measure-Object Length -Sum).Sum
           Write-Host "Total output bytes: $total"
 
       - name: Package prototype
         shell: pwsh
         run: |
-          Copy-Item .\xaml-src\README.txt .\xaml-src\dist\README.txt -Force
+          @'
+          WinUI 3 minimal launch baseline
+          C++ / x64 / Unpackaged / Framework-dependent
+          Windows App SDK target: 1.7.9 (1.7.260224002)
+          This prototype only opens a window and handles one button click.
+          It does not access Genshin Impact registry data.
+          '@ | Set-Content -Encoding utf8 .\xaml-src\dist\README-TEST.txt
           $hash = (Get-FileHash .\xaml-src\dist\GenshinSwitcherXamlPrototype.exe -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  GenshinSwitcherXamlPrototype.exe" | Set-Content -Encoding ascii .\xaml-src\dist\GenshinSwitcherXamlPrototype.exe.sha256
-          Compress-Archive -Path .\xaml-src\dist\* -DestinationPath .\GenshinSwitcher-WinUI3-XAML-Prototype-x64-pri.zip -Force
-          Get-Item .\GenshinSwitcher-WinUI3-XAML-Prototype-x64-pri.zip | Format-Table Name,Length
+          Compress-Archive -Path .\xaml-src\dist\* -DestinationPath .\GenshinSwitcher-WinUI3-1.7-Minimal-x64.zip -Force
+          Get-Item .\GenshinSwitcher-WinUI3-1.7-Minimal-x64.zip | Format-Table Name,Length
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: GenshinSwitcher-WinUI3-XAML-Prototype-x64-pri
-          path: .\GenshinSwitcher-WinUI3-XAML-Prototype-x64-pri.zip
+          name: GenshinSwitcher-WinUI3-1.7-Minimal-x64
+          path: .\GenshinSwitcher-WinUI3-1.7-Minimal-x64.zip
           retention-days: 14
           if-no-files-found: error
