@@ -30,6 +30,7 @@ jobs:
           [IO.File]::WriteAllBytes('.\prototype-source.zip', [Convert]::FromBase64String(($b64 -replace '\s','')))
           Expand-Archive .\prototype-source.zip .\prototype-src -Force
           Copy-Item .\winui3-prototype\GenshinSwitcherWinUI3Prototype.override.vcxproj .\prototype-src\GenshinSwitcherWinUI3Prototype.vcxproj -Force
+          Copy-Item .\winui3-prototype\main.override.cpp .\prototype-src\main.cpp -Force
           Get-ChildItem .\prototype-src | Format-Table Name,Length
 
       - name: Restore native Windows App SDK build packages
@@ -43,11 +44,6 @@ jobs:
           nuget install Microsoft.Windows.SDK.BuildTools -Version 10.0.26100.8249 -OutputDirectory .\packages -NonInteractive
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Get-ChildItem .\packages -Directory | Select-Object Name | Sort-Object Name | Format-Table
-
-          Write-Host '=== WebView2 package assets ==='
-          Get-ChildItem .\packages\Microsoft.Web.WebView2.1.0.4129.50 -Recurse -File |
-            ForEach-Object { $_.FullName.Replace((Get-Location).Path + '\\','') } |
-            Sort-Object | Write-Host
 
       - name: Build x64 Release
         shell: pwsh
