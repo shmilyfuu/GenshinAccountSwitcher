@@ -64,6 +64,24 @@ jobs:
           -p:DebugSymbols=false
           -o ..\..\dist
 
+      - name: Launch smoke test
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path .\dist\GenshinAccountSwitcher.exe
+          $p = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 6
+          if ($p.HasExited) {
+            Write-Host "Published app exited during launch smoke test. ExitCode=$($p.ExitCode)"
+            Write-Host "Recent Application log entries:"
+            Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=(Get-Date).AddMinutes(-5)} -ErrorAction SilentlyContinue |
+              Where-Object { $_.ProviderName -in @('.NET Runtime','Application Error','Windows Error Reporting') } |
+              Select-Object -First 12 TimeCreated, ProviderName, Id, LevelDisplayName, Message |
+              Format-List | Out-String -Width 240 | Write-Host
+            exit 1
+          }
+          Write-Host "Published app remained alive for 6 seconds."
+          Stop-Process -Id $p.Id -Force
+
       - name: Create SHA-256
         shell: pwsh
         run: |
