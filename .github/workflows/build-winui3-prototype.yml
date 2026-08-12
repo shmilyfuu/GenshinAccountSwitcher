@@ -62,15 +62,11 @@ jobs:
       - name: Install Windows App Runtime 1.8 for launch test
         shell: pwsh
         run: |
-          $runtime = Get-AppxPackage Microsoft.WindowsAppRuntime.1.8 -ErrorAction SilentlyContinue | Where-Object { $_.Architecture -eq 'X64' } | Sort-Object Version -Descending | Select-Object -First 1
-          if ($runtime) {
-            Write-Host "Runtime already installed: $($runtime.PackageFullName)"
-          } else {
-            $url = 'https://aka.ms/windowsappsdk/1.8/1.8.260710003/windowsappruntimeinstall-x64.exe'
-            Invoke-WebRequest $url -OutFile .\WindowsAppRuntimeInstall-x64.exe
-            $p = Start-Process .\WindowsAppRuntimeInstall-x64.exe -ArgumentList '--quiet' -Wait -PassThru
-            if ($p.ExitCode -ne 0) { throw "Runtime installer failed with exit code $($p.ExitCode)" }
-          }
+          $url = 'https://download.microsoft.com/download/712421b4-6f72-47fc-acb8-2ebf030b2260/WindowsAppRuntimeInstall-x64.exe'
+          Invoke-WebRequest $url -OutFile .\WindowsAppRuntimeInstall-x64.exe
+          $p = Start-Process .\WindowsAppRuntimeInstall-x64.exe -ArgumentList '--quiet' -Wait -PassThru
+          Write-Host "Runtime installer exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { throw "Runtime installer failed with exit code $($p.ExitCode)" }
 
       - name: Launch smoke test
         shell: pwsh
