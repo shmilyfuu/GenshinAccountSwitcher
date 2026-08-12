@@ -44,6 +44,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Get-ChildItem .\packages -Directory | Select-Object Name | Sort-Object Name | Format-Table
 
+          Write-Host '=== Native build assets ==='
+          Get-ChildItem .\packages -Recurse -File -Include *.props,*.targets,*.winmd |
+            Where-Object { $_.FullName -match 'WindowsAppSDK|CppWinRT|SDK.BuildTools' } |
+            ForEach-Object { $_.FullName.Replace((Get-Location).Path + '\\','') } |
+            Sort-Object | Write-Host
+
       - name: Build x64 Release
         shell: pwsh
         working-directory: .\prototype-src
