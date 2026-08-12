@@ -1,0 +1,77 @@
+name: Build WinUI3 XAML Prototype
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ winui3-ui-prototype ]
+    paths:
+      - 'winui3-xaml-prototype/**'
+      - '.github/workflows/build-winui3-xaml-prototype.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Reconstruct source
+        shell: pwsh
+        run: |
+          $b64 = Get-Content .\winui3-xaml-prototype\source.b64 -Raw
+          [IO.File]::WriteAllBytes('.\xaml-source.zip', [Convert]::FromBase64String(($b64 -replace '\s','')))
+          Expand-Archive .\xaml-source.zip .\xaml-src -Force
+          Get-ChildItem .\xaml-src | Sort-Object Name | Format-Table Name,Length
+
+      - name: Restore native packages
+        shell: pwsh
+        working-directory: .\xaml-src
+        run: |
+          nuget install Microsoft.WindowsAppSDK -Version 1.8.260710003 -OutputDirectory .\packages -DependencyVersion Highest -NonInteractive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          nuget install Microsoft.Windows.CppWinRT -Version 3.0.260715.1 -OutputDirectory .\packages -NonInteractive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          nuget install Microsoft.Windows.SDK.BuildTools -Version 10.0.26100.8249 -OutputDirectory .\packages -NonInteractive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build x64 Release
+        shell: pwsh
+        working-directory: .\xaml-src
+        run: |
+          msbuild .\GenshinSwitcherXamlPrototype.sln /m /p:Configuration=Release /p:Platform=x64 /v:minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Inspect output
+        shell: pwsh
+        run: |
+          Get-ChildItem .\xaml-src\dist -File | Sort-Object Length -Descending | Format-Table Name,Length
+          if (!(Test-Path .\xaml-src\dist\GenshinSwitcherXamlPrototype.exe)) { throw 'EXE missing' }
+          $total = (Get-ChildItem .\xaml-src\dist -File | Measure-Object Length -Sum).Sum
+          Write-Host "Total output bytes: $total"
+
+      - name: Package prototype
+        shell: pwsh
+        run: |
+          Copy-Item .\xaml-src\README.txt .\xaml-src\dist\README.txt -Force
+          Copy-Item .\xaml-src\diagnose.cmd .\xaml-src\dist\diagnose.cmd -Force
+          Copy-Item .\xaml-src\diagnose.ps1 .\xaml-src\dist\diagnose.ps1 -Force
+          $hash = (Get-FileHash .\xaml-src\dist\GenshinSwitcherXamlPrototype.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  GenshinSwitcherXamlPrototype.exe" | Set-Content -Encoding ascii .\xaml-src\dist\GenshinSwitcherXamlPrototype.exe.sha256
+          Compress-Archive -Path .\xaml-src\dist\* -DestinationPath .\GenshinSwitcher-WinUI3-XAML-Prototype-x64.zip -Force
+          Get-Item .\GenshinSwitcher-WinUI3-XAML-Prototype-x64.zip | Format-Table Name,Length
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GenshinSwitcher-WinUI3-XAML-Prototype-x64
+          path: .\GenshinSwitcher-WinUI3-XAML-Prototype-x64.zip
+          retention-days: 14
+          if-no-files-found: error
