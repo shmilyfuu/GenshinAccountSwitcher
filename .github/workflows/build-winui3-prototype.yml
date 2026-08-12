@@ -30,41 +30,12 @@ jobs:
           [IO.File]::WriteAllBytes('.\prototype-source.zip', [Convert]::FromBase64String(($b64 -replace '\s','')))
           Expand-Archive .\prototype-source.zip .\prototype-src -Force
           Copy-Item .\winui3-prototype\GenshinSwitcherWinUI3Prototype.override.vcxproj .\prototype-src\GenshinSwitcherWinUI3Prototype.vcxproj -Force
-          Copy-Item .\winui3-prototype\main.override.cpp .\prototype-src\main.cpp -Force
-
-          # A code-only WinUI 3 C++ app still needs a XAML metadata provider so the framework
-          # can resolve control styles and types without App.xaml/generated metadata.
-          $mainPath = '.\prototype-src\main.cpp'
-          $code = Get-Content $mainPath -Raw
-          $code = $code.Replace('#include <winrt/Microsoft.UI.Xaml.Media.Animation.h>', '#include <winrt/Microsoft.UI.Xaml.Media.Animation.h>' + "`r`n" + '#include <winrt/Microsoft.UI.Xaml.XamlTypeInfo.h>')
-          $code = $code.Replace('#include <winrt/Windows.UI.h>', '#include <winrt/Windows.UI.h>' + "`r`n" + '#include <winrt/Windows.UI.Xaml.Interop.h>')
-          $code = $code.Replace('using namespace Microsoft::UI::Xaml::Shapes;', 'using namespace Microsoft::UI::Xaml::Shapes;' + "`r`n" + 'using namespace Microsoft::UI::Xaml::Markup;' + "`r`n" + 'using namespace Microsoft::UI::Xaml::XamlTypeInfo;' + "`r`n" + 'using namespace Windows::UI::Xaml::Interop;')
-          $code = $code.Replace('class PrototypeApp : public ApplicationT<PrototypeApp>', 'class PrototypeApp : public ApplicationT<PrototypeApp, IXamlMetadataProvider>')
-          $code = [regex]::Replace($code, '(?s)\s*PrototypeApp\(\)\s*\{\s*ResourceDictionary resources;\s*resources\.MergedDictionaries\(\)\.Append\(XamlControlsResources\(\)\);\s*Resources\(resources\);\s*\}\s*', "`r`n")
-          $code = $code.Replace('void OnLaunched(LaunchActivatedEventArgs const&)' + "`r`n" + '        {' + "`r`n" + '            m_window = Window();', 'void OnLaunched(LaunchActivatedEventArgs const&)' + "`r`n" + '        {' + "`r`n" + '            Resources().MergedDictionaries().Append(XamlControlsResources());' + "`r`n`r`n" + '            m_window = Window();')
-          $metadataMethods = @'
-        IXamlType GetXamlType(TypeName const& type)
-        {
-            return m_xamlProvider.GetXamlType(type);
-        }
-
-        IXamlType GetXamlType(hstring const& fullname)
-        {
-            return m_xamlProvider.GetXamlType(fullname);
-        }
-
-        com_array<XmlnsDefinition> GetXmlnsDefinitions()
-        {
-            return m_xamlProvider.GetXmlnsDefinitions();
-        }
-
-    private:
-'@
-          $code = $code.Replace('    private:' + "`r`n" + '        UIElement BuildRoot()', $metadataMethods + '        UIElement BuildRoot()')
-          $code = $code.Replace('        Window m_window{ nullptr };', '        XamlControlsXamlMetaDataProvider m_xamlProvider;' + "`r`n" + '        Window m_window{ nullptr };')
-          [IO.File]::WriteAllText((Resolve-Path $mainPath), $code, [Text.UTF8Encoding]::new($false))
-          Get-ChildItem .\prototype-src | Format-Table Name,Length
-          Select-String -Path $mainPath -Pattern 'IXamlMetadataProvider|XamlControlsXamlMetaDataProvider|MergedDictionaries'
+          Copy-Item .\winui3-prototype\metadata.patch .\prototype-src\metadata.patch -Force
+          Push-Location .\prototype-src
+          git apply --ignore-space-change --ignore-whitespace .\metadata.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Pop-Location
+          Select-String -Path .\prototype-src\main.cpp -Pattern 'IXamlMetadataProvider|XamlControlsXamlMetaDataProvider|MergedDictionaries'
 
       - name: Restore native Windows App SDK build packages
         shell: pwsh
@@ -76,7 +47,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           nuget install Microsoft.Windows.SDK.BuildTools -Version 10.0.26100.8249 -OutputDirectory .\packages -NonInteractive
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Get-ChildItem .\packages -Directory | Select-Object Name | Sort-Object Name | Format-Table
 
       - name: Build x64 Release
         shell: pwsh
