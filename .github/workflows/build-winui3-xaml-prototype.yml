@@ -26,7 +26,7 @@ jobs:
       - name: Reconstruct source
         shell: pwsh
         run: |
-          $b64 = Get-Content .\winui3-xaml-prototype\source-v3.b64 -Raw
+          $b64 = Get-Content .\winui3-xaml-prototype\source-v4.b64 -Raw
           [IO.File]::WriteAllBytes('.\xaml-source.zip', [Convert]::FromBase64String(($b64 -replace '\s','')))
           Expand-Archive .\xaml-source.zip .\xaml-src -Force
           Get-ChildItem .\xaml-src | Sort-Object Name | Format-Table Name,Length
@@ -66,13 +66,13 @@ jobs:
           Copy-Item .\xaml-src\README.txt .\xaml-src\dist\README.txt -Force
           $hash = (Get-FileHash .\xaml-src\dist\GenshinSwitcherXamlPrototype.exe -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  GenshinSwitcherXamlPrototype.exe" | Set-Content -Encoding ascii .\xaml-src\dist\GenshinSwitcherXamlPrototype.exe.sha256
-          Compress-Archive -Path .\xaml-src\dist\* -DestinationPath .\GenshinSwitcher-WinUI3-XAML-Prototype-x64-v3.zip -Force
-          Get-Item .\GenshinSwitcher-WinUI3-XAML-Prototype-x64-v3.zip | Format-Table Name,Length
+          Compress-Archive -Path .\xaml-src\dist\* -DestinationPath .\GenshinSwitcher-WinUI3-XAML-Prototype-x64-v4.zip -Force
+          Get-Item .\GenshinSwitcher-WinUI3-XAML-Prototype-x64-v4.zip | Format-Table Name,Length
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: GenshinSwitcher-WinUI3-XAML-Prototype-x64-v3
-          path: .\GenshinSwitcher-WinUI3-XAML-Prototype-x64-v3.zip
+          name: GenshinSwitcher-WinUI3-XAML-Prototype-x64-v4
+          path: .\GenshinSwitcher-WinUI3-XAML-Prototype-x64-v4.zip
           retention-days: 14
           if-no-files-found: error
