@@ -1,0 +1,73 @@
+name: Build Windows EXE
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Extract source archive
+        shell: pwsh
+        run: |
+          Expand-Archive -Path .\source.zip -DestinationPath .\build-src -Force
+          Get-ChildItem .\build-src\GenshinAccountSwitcher | Select-Object Name
+
+      - name: Restore
+        working-directory: .\build-src\GenshinAccountSwitcher
+        run: dotnet restore .\GenshinAccountSwitcher.sln
+
+      - name: Build
+        working-directory: .\build-src\GenshinAccountSwitcher
+        run: dotnet build .\GenshinAccountSwitcher.sln -c Release --no-restore
+
+      - name: Run core smoke tests
+        working-directory: .\build-src\GenshinAccountSwitcher
+        run: dotnet run --project .\Tests\GenshinAccountSwitcher.Tests.csproj -c Release --no-build
+
+      - name: Publish self-contained single-file
+        working-directory: .\build-src\GenshinAccountSwitcher
+        run: >-
+          dotnet publish .\GenshinAccountSwitcher.csproj
+          -c Release
+          -r win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:PublishTrimmed=false
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:DebugType=None
+          -p:DebugSymbols=false
+          -o ..\..\dist
+
+      - name: Create SHA-256
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path .\dist\GenshinAccountSwitcher.exe
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  GenshinAccountSwitcher.exe" | Set-Content -Encoding ascii .\dist\GenshinAccountSwitcher.exe.sha256
+          Get-ChildItem .\dist | Format-Table Name, Length
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GenshinAccountSwitcher-win-x64
+          path: |
+            .\dist\GenshinAccountSwitcher.exe
+            .\dist\GenshinAccountSwitcher.exe.sha256
+          if-no-files-found: error
+          retention-days: 14
