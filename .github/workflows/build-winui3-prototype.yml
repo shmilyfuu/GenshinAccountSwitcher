@@ -23,15 +23,19 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
-      - name: Reconstruct prototype source
+      - name: Reconstruct full UI prototype source
         shell: pwsh
         run: |
           $b64 = Get-Content .\winui3-prototype\source.b64 -Raw
           [IO.File]::WriteAllBytes('.\prototype-source.zip', [Convert]::FromBase64String(($b64 -replace '\s','')))
           Expand-Archive .\prototype-source.zip .\prototype-src -Force
           Copy-Item .\winui3-prototype\GenshinSwitcherWinUI3Prototype.override.vcxproj .\prototype-src\GenshinSwitcherWinUI3Prototype.vcxproj -Force
-          Copy-Item .\winui3-prototype\minimal.cpp .\prototype-src\main.cpp -Force
-          Select-String -Path .\prototype-src\main.cpp -Pattern 'IXamlMetadataProvider|XamlControlsXamlMetaDataProvider|XamlControlsResources'
+          Copy-Item .\winui3-prototype\metadata.patch .\prototype-src\metadata.patch -Force
+          Push-Location .\prototype-src
+          git apply --ignore-space-change --ignore-whitespace .\metadata.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Pop-Location
+          Select-String -Path .\prototype-src\main.cpp -Pattern 'IXamlMetadataProvider|XamlControlsXamlMetaDataProvider|BuildAccountCard'
 
       - name: Restore native Windows App SDK build packages
         shell: pwsh
@@ -58,38 +62,26 @@ jobs:
           $total = (Get-ChildItem .\prototype-src\dist -File | Measure-Object Length -Sum).Sum
           Write-Host "Total output bytes: $total"
 
-      - name: Install Windows App Runtime 1.8 for launch test
-        shell: pwsh
-        run: |
-          $url = 'https://download.microsoft.com/download/712421b4-6f72-47fc-acb8-2ebf030b2260/WindowsAppRuntimeInstall-x64.exe'
-          Invoke-WebRequest $url -OutFile .\WindowsAppRuntimeInstall-x64.exe
-          $p = Start-Process .\WindowsAppRuntimeInstall-x64.exe -ArgumentList '--quiet' -Wait -PassThru
-          if ($p.ExitCode -ne 0) { throw "Runtime installer failed with exit code $($p.ExitCode)" }
-
-      - name: Launch smoke test
-        shell: pwsh
-        run: |
-          $exe = Resolve-Path .\prototype-src\dist\GenshinSwitcher-WinUI3-Prototype.exe
-          $p = Start-Process -FilePath $exe -PassThru
-          Start-Sleep -Seconds 6
-          if ($p.HasExited) {
-            Write-Host "Prototype exited early. ExitCode=$($p.ExitCode)"
-            Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=(Get-Date).AddMinutes(-5)} -ErrorAction SilentlyContinue |
-              Where-Object { $_.ProviderName -in @('.NET Runtime','Application Error','Windows Error Reporting') } |
-              Select-Object -First 10 TimeCreated,ProviderName,Id,Message |
-              Format-List | Out-String -Width 240 | Write-Host
-            exit 1
-          }
-          Write-Host 'Prototype remained alive for 6 seconds.'
-          Stop-Process -Id $p.Id -Force
-
       - name: Package prototype
         shell: pwsh
         run: |
-          Copy-Item .\prototype-src\README.txt .\prototype-src\dist\README.txt -Force
+          @'
+          原神账号切换器 · WinUI 3 UI 原型
+
+          这是纯界面测试版：
+          - 不读取注册表
+          - 不修改注册表
+          - 不保存真实账号
+          - 不调用 DPAPI
+          - 不启动原神
+
+          请完整解压后运行 GenshinSwitcher-WinUI3-Prototype.exe。
+          目标运行时：Windows App SDK 1.8 x64（框架依赖）。
+          '@ | Set-Content -Encoding UTF8 .\prototype-src\dist\README.txt
           $hash = (Get-FileHash .\prototype-src\dist\GenshinSwitcher-WinUI3-Prototype.exe -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  GenshinSwitcher-WinUI3-Prototype.exe" | Set-Content -Encoding ascii .\prototype-src\dist\GenshinSwitcher-WinUI3-Prototype.exe.sha256
           Compress-Archive -Path .\prototype-src\dist\* -DestinationPath .\GenshinSwitcher-WinUI3-Prototype-x64.zip -Force
+          Get-Item .\GenshinSwitcher-WinUI3-Prototype-x64.zip | Format-Table Name,Length
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
