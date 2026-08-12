@@ -30,12 +30,8 @@ jobs:
           [IO.File]::WriteAllBytes('.\prototype-source.zip', [Convert]::FromBase64String(($b64 -replace '\s','')))
           Expand-Archive .\prototype-source.zip .\prototype-src -Force
           Copy-Item .\winui3-prototype\GenshinSwitcherWinUI3Prototype.override.vcxproj .\prototype-src\GenshinSwitcherWinUI3Prototype.vcxproj -Force
-          Copy-Item .\winui3-prototype\metadata.patch .\prototype-src\metadata.patch -Force
-          Push-Location .\prototype-src
-          git apply --ignore-space-change --ignore-whitespace .\metadata.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Pop-Location
-          Select-String -Path .\prototype-src\main.cpp -Pattern 'IXamlMetadataProvider|XamlControlsXamlMetaDataProvider|MergedDictionaries'
+          Copy-Item .\winui3-prototype\minimal.cpp .\prototype-src\main.cpp -Force
+          Select-String -Path .\prototype-src\main.cpp -Pattern 'IXamlMetadataProvider|XamlControlsXamlMetaDataProvider|XamlControlsResources'
 
       - name: Restore native Windows App SDK build packages
         shell: pwsh
@@ -68,7 +64,6 @@ jobs:
           $url = 'https://download.microsoft.com/download/712421b4-6f72-47fc-acb8-2ebf030b2260/WindowsAppRuntimeInstall-x64.exe'
           Invoke-WebRequest $url -OutFile .\WindowsAppRuntimeInstall-x64.exe
           $p = Start-Process .\WindowsAppRuntimeInstall-x64.exe -ArgumentList '--quiet' -Wait -PassThru
-          Write-Host "Runtime installer exit code: $($p.ExitCode)"
           if ($p.ExitCode -ne 0) { throw "Runtime installer failed with exit code $($p.ExitCode)" }
 
       - name: Launch smoke test
@@ -95,7 +90,6 @@ jobs:
           $hash = (Get-FileHash .\prototype-src\dist\GenshinSwitcher-WinUI3-Prototype.exe -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  GenshinSwitcher-WinUI3-Prototype.exe" | Set-Content -Encoding ascii .\prototype-src\dist\GenshinSwitcher-WinUI3-Prototype.exe.sha256
           Compress-Archive -Path .\prototype-src\dist\* -DestinationPath .\GenshinSwitcher-WinUI3-Prototype-x64.zip -Force
-          Get-Item .\GenshinSwitcher-WinUI3-Prototype-x64.zip | Format-Table Name,Length
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
