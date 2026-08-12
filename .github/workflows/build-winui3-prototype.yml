@@ -29,25 +29,26 @@ jobs:
           $b64 = Get-Content .\winui3-prototype\source.b64 -Raw
           [IO.File]::WriteAllBytes('.\prototype-source.zip', [Convert]::FromBase64String(($b64 -replace '\s','')))
           Expand-Archive .\prototype-source.zip .\prototype-src -Force
-
-          # Unpackaged WinUI 3 is a desktop app. Remove the UWP application-type markers
-          # from the hand-written minimal vcxproj while retaining UseWinUI + WindowsPackageType=None.
-          $proj = '.\prototype-src\GenshinSwitcherWinUI3Prototype.vcxproj'
-          $xml = Get-Content $proj -Raw
-          $xml = $xml.Replace('    <ApplicationType>Windows Store</ApplicationType>' + "`r`n", '')
-          $xml = $xml.Replace('    <ApplicationTypeRevision>10.0</ApplicationTypeRevision>' + "`r`n", '')
-          $xml = $xml.Replace('    <ApplicationType>Windows Store</ApplicationType>' + "`n", '')
-          $xml = $xml.Replace('    <ApplicationTypeRevision>10.0</ApplicationTypeRevision>' + "`n", '')
-          [IO.File]::WriteAllText((Resolve-Path $proj), $xml, [Text.UTF8Encoding]::new($false))
-
+          Copy-Item .\winui3-prototype\GenshinSwitcherWinUI3Prototype.override.vcxproj .\prototype-src\GenshinSwitcherWinUI3Prototype.vcxproj -Force
           Get-ChildItem .\prototype-src | Format-Table Name,Length
-          Select-String -Path $proj -Pattern 'ApplicationType|UseWinUI|WindowsPackageType'
 
-      - name: Restore and build x64 Release
+      - name: Restore native Windows App SDK build packages
         shell: pwsh
         working-directory: .\prototype-src
         run: |
-          msbuild .\GenshinSwitcherWinUI3Prototype.sln /restore /m /p:Configuration=Release /p:Platform=x64 /v:minimal
+          nuget install Microsoft.WindowsAppSDK -Version 1.8.260710003 -OutputDirectory .\packages -DependencyVersion Highest -NonInteractive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          nuget install Microsoft.Windows.CppWinRT -Version 3.0.260715.1 -OutputDirectory .\packages -NonInteractive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          nuget install Microsoft.Windows.SDK.BuildTools -Version 10.0.26100.8249 -OutputDirectory .\packages -NonInteractive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-ChildItem .\packages -Directory | Select-Object Name | Sort-Object Name | Format-Table
+
+      - name: Build x64 Release
+        shell: pwsh
+        working-directory: .\prototype-src
+        run: |
+          msbuild .\GenshinSwitcherWinUI3Prototype.sln /m /p:Configuration=Release /p:Platform=x64 /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Show output size
