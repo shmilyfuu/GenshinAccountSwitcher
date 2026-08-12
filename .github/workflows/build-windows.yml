@@ -26,7 +26,7 @@ jobs:
         shell: pwsh
         run: |
           $parts = Get-ChildItem .\source.parts\source.part.* | Sort-Object Name
-          if ($parts.Count -ne 8) { throw "Expected 8 source parts, found $($parts.Count)." }
+          if ($parts.Count -ne 10) { throw "Expected 10 source parts, found $($parts.Count)." }
           $b64 = ($parts | ForEach-Object { Get-Content $_.FullName -Raw }) -join ''
           $b64 = $b64 -replace '\s', ''
           [IO.File]::WriteAllBytes('.\source.reconstructed.zip', [Convert]::FromBase64String($b64))
