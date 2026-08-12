@@ -22,10 +22,19 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      - name: Extract source archive
+      - name: Reconstruct and verify source archive
         shell: pwsh
         run: |
-          Expand-Archive -Path .\source.zip -DestinationPath .\build-src -Force
+          $parts = Get-ChildItem .\source.parts\source.part.* | Sort-Object Name
+          if ($parts.Count -ne 8) { throw "Expected 8 source parts, found $($parts.Count)." }
+          $b64 = ($parts | ForEach-Object { Get-Content $_.FullName -Raw }) -join ''
+          $b64 = $b64 -replace '\s', ''
+          [IO.File]::WriteAllBytes('.\source.reconstructed.zip', [Convert]::FromBase64String($b64))
+          $expected = '77621776f5258bb35894bf0e770fdd30cfed1412f942c5a1d7a2a15307077775'
+          $actual = (Get-FileHash .\source.reconstructed.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          Write-Host "Source archive SHA-256: $actual"
+          if ($actual -ne $expected) { throw "Source archive SHA-256 mismatch." }
+          Expand-Archive -Path .\source.reconstructed.zip -DestinationPath .\build-src -Force
           Get-ChildItem .\build-src\GenshinAccountSwitcher | Select-Object Name
 
       - name: Restore
