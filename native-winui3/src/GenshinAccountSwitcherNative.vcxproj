@@ -114,7 +114,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="README.txt" />
-    <None Include="Assets\AppIcon.b64.part.*" />
+    <None Include="Assets\AppIcon.ico" />
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
@@ -123,10 +123,6 @@
     <Import Project="$(NugetPackageDirectory)\Microsoft.Windows.SDK.BuildTools.10.0.26100.8249\build\Microsoft.Windows.SDK.BuildTools.targets" Condition="Exists('$(NugetPackageDirectory)\Microsoft.Windows.SDK.BuildTools.10.0.26100.8249\build\Microsoft.Windows.SDK.BuildTools.targets')" />
     <Import Project="$(NugetPackageDirectory)\Microsoft.WindowsAppSDK.1.7.260224002\build\native\Microsoft.WindowsAppSDK.targets" Condition="Exists('$(NugetPackageDirectory)\Microsoft.WindowsAppSDK.1.7.260224002\build\native\Microsoft.WindowsAppSDK.targets')" />
   </ImportGroup>
-
-  <Target Name="DecodeApplicationIcon" BeforeTargets="PrepareForBuild">
-    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;$parts = Get-ChildItem -LiteralPath '$(ProjectDir)Assets' -Filter 'AppIcon.b64.part.*' | Sort-Object Name; if (-not $parts) { throw 'Application icon source parts are missing.' }; $b64 = (($parts | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw }) -join '') -replace '\s',''; [IO.File]::WriteAllBytes('$(ProjectDir)Assets\AppIcon.ico',[Convert]::FromBase64String($b64))&quot;" />
-  </Target>
 
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <Error Condition="!Exists('$(NugetPackageDirectory)\Microsoft.WindowsAppSDK.1.7.260224002\build\native\Microsoft.WindowsAppSDK.props')" Text="Microsoft.WindowsAppSDK 1.7 package is missing." />
