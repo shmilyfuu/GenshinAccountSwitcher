@@ -27,7 +27,8 @@
 
                 <StackPanel Spacing="2">
                     <TextBlock Text="原神账号管理"
-                               Style="{StaticResource TitleTextBlockStyle}" />
+                               Style="{StaticResource TitleTextBlockStyle}"
+                               FontSize="24" />
                     <TextBlock Text="国服 · 本地账号管理"
                                Style="{StaticResource CaptionTextBlockStyle}"
                                Opacity="0.62" />
@@ -40,7 +41,7 @@
                         Height="32"
                         Padding="0"
                         FontSize="18"
-                        VerticalAlignment="Center">
+                        VerticalAlignment="Top">
                     <Button.Flyout>
                         <MenuFlyout>
                             <MenuFlyoutItem Text="刷新状态" Click="OnRefreshClick" />
@@ -95,7 +96,7 @@
                 </Border>
             </StackPanel>
 
-            <Grid Grid.Row="2" MinHeight="240">
+            <Grid Grid.Row="2">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
@@ -144,7 +145,7 @@
 
             <TextBlock x:Name="StatusText"
                        Grid.Row="4"
-                       Margin="0,8,0,0"
+                       Margin="0,12,0,0"
                        MinHeight="20"
                        Text="游戏未运行"
                        Style="{StaticResource CaptionTextBlockStyle}"
@@ -153,9 +154,6 @@
                        TextWrapping="Wrap"
                        Visibility="Visible" />
 
-            <!-- Existing controller code writes account-specific notices to this name.
-                 Keep it in the tree for compatibility, but all visible notices are mirrored
-                 into the permanent status line by WindowEnhancements.cpp. -->
             <TextBlock x:Name="CredentialStateText"
                        Grid.Row="0"
                        Height="0"
