@@ -2,6 +2,7 @@
 #include "MainWindow.xaml.h"
 #include "resource.h"
 
+#include <winrt/Microsoft.UI.Interop.h>
 #include <tlhelp32.h>
 #include <cmath>
 
@@ -148,6 +149,22 @@ namespace winrt::GenshinAccountSwitcher::implementation
             instance, MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON,
             bigCx, bigCy, LR_DEFAULTCOLOR | LR_SHARED));
 
+        // WinUI 3 owns the top-level window presentation through AppWindow. Use its icon
+        // API first so the system title bar and taskbar receive the same embedded icon.
+        if (bigIcon)
+        {
+            try
+            {
+                auto windowId = Microsoft::UI::GetWindowIdFromWindow(hwnd);
+                auto appWindow = Microsoft::UI::Windowing::AppWindow::GetFromWindowId(windowId);
+                auto iconId = Microsoft::UI::GetIconIdFromIcon(bigIcon);
+                appWindow.SetIcon(iconId);
+                return;
+            }
+            catch (...) {}
+        }
+
+        // Keep the traditional messages as a compatibility fallback.
         if (smallIcon) SendMessageW(hwnd, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(smallIcon));
         if (bigIcon) SendMessageW(hwnd, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(bigIcon));
     }
@@ -159,12 +176,12 @@ namespace winrt::GenshinAccountSwitcher::implementation
 
     void MainWindow::NormalizeAccountRows()
     {
-        auto secondaryAccent = LookupBrush(
-            L"AccentFillColorSecondaryBrush",
-            MakeFallbackBrush(0xFF, 0x2D, 0x5F, 0x86));
-        auto textOnAccent = LookupBrush(
-            L"TextOnAccentFillColorPrimaryBrush",
-            MakeFallbackBrush(0xFF, 0xFF, 0xFF, 0xFF));
+        auto badgeBackground = LookupBrush(
+            L"SubtleFillColorSecondaryBrush",
+            MakeFallbackBrush(0xFF, 0x32, 0x32, 0x32));
+        auto badgeForeground = LookupBrush(
+            L"AccentTextFillColorPrimaryBrush",
+            MakeFallbackBrush(0xFF, 0x60, 0xCD, 0xFF));
 
         for (auto& visual : m_visuals)
         {
@@ -186,12 +203,13 @@ namespace winrt::GenshinAccountSwitcher::implementation
                 }
             }
 
-            // Critical: do not write any layout property when the row already has the
-            // requested shape. Re-writing columns from LayoutUpdated would schedule another
-            // layout pass indefinitely.
+            // Do not write any layout property when the row already has the requested
+            // shape. Re-writing columns from LayoutUpdated would schedule another layout pass.
             if (alreadyNormalized) continue;
 
-            visual.card.Padding(Thickness{ 16, 0, 16, 0 });
+            // Keep a symmetric safe area inside the actual ListViewItem content bounds.
+            // The selection indicator and an auto-visible scroll bar remain owned by WinUI.
+            visual.card.Padding(Thickness{ 12, 0, 12, 0 });
             visual.card.CornerRadius(CornerRadius{ 4 });
 
             columns.Clear();
@@ -232,11 +250,12 @@ namespace winrt::GenshinAccountSwitcher::implementation
                 visual.badge.VerticalAlignment(VerticalAlignment::Center);
                 visual.badge.CornerRadius(CornerRadius{ 4 });
                 visual.badge.Padding(Thickness{ 6, 2, 6, 2 });
-                visual.badge.Background(secondaryAccent);
+                visual.badge.Margin(Thickness{ 0, 0, 2, 0 });
+                visual.badge.Background(badgeBackground);
             }
             if (visual.badgeText)
             {
-                visual.badgeText.Foreground(textOnAccent);
+                visual.badgeText.Foreground(badgeForeground);
                 visual.badgeText.Opacity(1.0);
             }
         }
