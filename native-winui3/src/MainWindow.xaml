@@ -8,7 +8,8 @@
     <Border x:Name="RootGrid"
             RequestedTheme="Dark"
             Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
-            Padding="16">
+            Padding="16"
+            Loaded="OnRootLoaded">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -25,7 +26,7 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Spacing="2">
-                    <TextBlock Text="原神账号切换器"
+                    <TextBlock Text="原神账号管理"
                                Style="{StaticResource TitleTextBlockStyle}" />
                     <TextBlock Text="国服 · 本地账号管理"
                                Style="{StaticResource CaptionTextBlockStyle}"
@@ -66,14 +67,16 @@
                         BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
                         BorderThickness="1"
                         CornerRadius="{ThemeResource ControlCornerRadius}"
-                        Padding="16,12">
-                    <Grid ColumnSpacing="16">
+                        Padding="16,12"
+                        MinHeight="64">
+                    <Grid ColumnSpacing="16" VerticalAlignment="Center">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <StackPanel Spacing="2">
+                        <StackPanel Spacing="2"
+                                    VerticalAlignment="Center">
                             <TextBlock x:Name="CurrentAccountText"
                                        Text="正在读取…"
                                        Style="{StaticResource SubtitleTextBlockStyle}" />
@@ -81,12 +84,6 @@
                                        Text="UID —"
                                        Style="{StaticResource CaptionTextBlockStyle}"
                                        Opacity="0.72" />
-                            <TextBlock x:Name="CredentialStateText"
-                                       Text=""
-                                       Style="{StaticResource CaptionTextBlockStyle}"
-                                       Foreground="{ThemeResource SystemFillColorCautionBrush}"
-                                       TextWrapping="Wrap"
-                                       Visibility="Collapsed" />
                         </StackPanel>
 
                         <Button x:Name="AddButton"
@@ -98,7 +95,7 @@
                 </Border>
             </StackPanel>
 
-            <Grid Grid.Row="2" MinHeight="210">
+            <Grid Grid.Row="2" MinHeight="240">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
@@ -124,7 +121,7 @@
                           SelectionMode="Single"
                           IsItemClickEnabled="False"
                           HorizontalContentAlignment="Stretch"
-                          MaxHeight="260"
+                          ScrollViewer.VerticalScrollBarVisibility="Auto"
                           SelectionChanged="OnAccountSelectionChanged" />
             </Grid>
 
@@ -140,19 +137,37 @@
                         Click="OnSwitchClick" />
                 <Button x:Name="SwitchLaunchButton"
                         Grid.Column="1"
-                        Content="启动"
-                        Style="{StaticResource AccentButtonStyle}"
+                        Content="启动游戏"
                         HorizontalAlignment="Stretch"
                         Click="OnSwitchLaunchClick" />
             </Grid>
 
-            <TextBlock Grid.Row="4"
-                       x:Name="StatusText"
-                       Text=""
-                       Margin="0,8,0,0"
-                       Style="{StaticResource CaptionTextBlockStyle}"
-                       Opacity="0.68"
-                       TextTrimming="CharacterEllipsis"
+            <Border Grid.Row="4"
+                    Margin="0,12,0,0"
+                    MinHeight="40"
+                    Padding="12,8"
+                    Background="{ThemeResource ControlFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="{ThemeResource ControlCornerRadius}">
+                <TextBlock x:Name="StatusText"
+                           Text="游戏未运行"
+                           Style="{StaticResource CaptionTextBlockStyle}"
+                           Opacity="0.78"
+                           VerticalAlignment="Center"
+                           TextWrapping="Wrap"
+                           Visibility="Visible" />
+            </Border>
+
+            <!-- Existing controller code writes account-specific notices to this name.
+                 Keep it in the tree for compatibility, but all visible notices are mirrored
+                 into the permanent status bar by WindowEnhancements.cpp. -->
+            <TextBlock x:Name="CredentialStateText"
+                       Grid.Row="0"
+                       Height="0"
+                       Width="0"
+                       Opacity="0"
+                       IsHitTestVisible="False"
                        Visibility="Collapsed" />
         </Grid>
     </Border>
