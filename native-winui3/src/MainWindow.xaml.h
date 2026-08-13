@@ -9,6 +9,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
         MainWindow();
 
         void OnWindowActivated(IInspectable const&, Microsoft::UI::Xaml::WindowActivatedEventArgs const&);
+        void OnRootLoaded(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void OnRefreshClick(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void OnAccountSelectionChanged(IInspectable const&, Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
         void OnAddClick(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
@@ -43,6 +44,16 @@ namespace winrt::GenshinAccountSwitcher::implementation
         int m_runtimePollTicks{ 0 };
         Microsoft::UI::Dispatching::DispatcherQueueTimer m_monitorTimer{ nullptr };
 
+        bool m_enhancementsInitialized{ false };
+        bool m_settingUnifiedStatus{ false };
+        std::int64_t m_statusTextCallbackToken{ 0 };
+        ULONGLONG m_statusOverrideUntil{ 0 };
+        HANDLE m_trackedGameProcess{ nullptr };
+        HANDLE m_gameExitWait{ nullptr };
+        DWORD m_trackedGamePid{ 0 };
+        Microsoft::UI::Dispatching::DispatcherQueueTimer m_processDiscoveryTimer{ nullptr };
+        Microsoft::UI::Dispatching::DispatcherQueueTimer m_statusTimer{ nullptr };
+
         void ResizeWindow();
         void RefreshUi(bool rebuildAccounts = true, bool showRefreshStatus = false);
         gas::CurrentState ClassifyProbe(gas::CurrentProbe const& probe, bool gameRunning);
@@ -59,6 +70,25 @@ namespace winrt::GenshinAccountSwitcher::implementation
         bool BackupCredential(gas::AccountProfile const& account);
         void RemoveCredentialBackup(gas::AccountProfile const& account) noexcept;
         static bool IdentitySnapshotEquals(gas::RegistrySnapshot const& a, gas::RegistrySnapshot const& b) noexcept;
+
+        void ConfigureFixedWindow();
+        void ApplyWindowIcon();
+        void NormalizeAccountRows();
+        void StartEnhancedMonitoring();
+        void DiscoverCurrentSessionGame();
+        void TrackGameProcess(DWORD pid);
+        void ReleaseTrackedGameProcess();
+        void OnTrackedGameExited();
+        void OnProcessDiscoveryTick(Microsoft::UI::Dispatching::DispatcherQueueTimer const&, IInspectable const&);
+        void OnStatusTimerTick(Microsoft::UI::Dispatching::DispatcherQueueTimer const&, IInspectable const&);
+        void OnAccountsLayoutUpdated(IInspectable const&, IInspectable const&);
+        void OnStatusTextPropertyChanged(Microsoft::UI::Xaml::DependencyObject const&, Microsoft::UI::Xaml::DependencyProperty const&);
+        void RefreshUnifiedStatus(bool force = false);
+        std::wstring BuildBaseStatusText() const;
+        void SetUnifiedStatusText(std::wstring const& text);
+        static DWORD FindCurrentSessionGameProcessId();
+        static VOID CALLBACK GameExitWaitCallback(PVOID context, BOOLEAN timedOut);
+        static LRESULT CALLBACK WindowSubclassProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam, UINT_PTR subclassId, DWORD_PTR referenceData);
 
         winrt::fire_and_forget SettleAndReconcileAsync(bool initialPass);
         winrt::fire_and_forget AddCurrentAsync();
