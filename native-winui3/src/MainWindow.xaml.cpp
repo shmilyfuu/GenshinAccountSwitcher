@@ -146,14 +146,16 @@ namespace winrt::GenshinAccountSwitcher::implementation
         state.hasAdl = probe.snapshot.adl.exists && !probe.snapshot.adl.data.empty();
         state.gameRunning = gameRunning;
 
-        if (!state.hasAdl)
+        // UID is the account identity key. A credential blob without a valid UID is
+        // deliberately left unassigned so stale ADL data cannot claim an account.
+        if (!state.hasAdl || probe.uid.empty())
             return state;
 
         auto const& accounts = m_core.Accounts();
         if (probe.exactAccountIndex >= 0 && probe.exactAccountIndex < static_cast<int>(accounts.size()))
         {
             auto const& exact = accounts[static_cast<size_t>(probe.exactAccountIndex)];
-            if (!probe.uid.empty() && exact.uid != probe.uid)
+            if (exact.uid != probe.uid)
             {
                 state.matchKind = gas::CurrentMatchKind::Inconsistent;
                 return state;
@@ -215,7 +217,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
 
             default:
                 if (m_currentState.hasAdl)
-                    CurrentAccountText().Text(m_currentState.uid.empty() ? L"未保存登录态" : L"未保存账号");
+                    CurrentAccountText().Text(m_currentState.uid.empty() ? L"未确认账号" : L"未保存账号");
                 else
                     CurrentAccountText().Text(L"未检测到登录态");
                 break;
@@ -388,11 +390,6 @@ namespace winrt::GenshinAccountSwitcher::implementation
                 m_runtimePollTicks = 0;
                 RefreshUi(false, false);
             }
-            else if (++m_runtimePollTicks >= 2)
-            {
-                m_runtimePollTicks = 0;
-                RefreshUi(false, false);
-            }
             return;
         }
 
@@ -516,6 +513,8 @@ namespace winrt::GenshinAccountSwitcher::implementation
                 SetStatus(L"检测到未保存账号，可在当前账号区域添加。");
             else if (!initialPass && finalState.matchKind == gas::CurrentMatchKind::ExactCredential)
                 SetStatus(L"账号状态已同步。");
+            else if (!initialPass && finalState.uid.empty())
+                SetStatus(L"未检测到可确认的当前 UID，本次未自动处理。");
             else if (initialPass)
                 SetStatus(L"");
         }
@@ -558,7 +557,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
                 co_await ShowMessageAsync(L"无法添加", L"当前注册表中没有可用的原神登录态。");
                 co_return;
             }
-            if (probe.exactAccountIndex >= 0)
+            if (state.matchKind == gas::CurrentMatchKind::ExactCredential && probe.exactAccountIndex >= 0)
             {
                 m_selectedIndex = probe.exactAccountIndex;
                 RefreshUi(true, false);
@@ -579,11 +578,32 @@ namespace winrt::GenshinAccountSwitcher::implementation
                     if (!uid.empty()) co_await ShowMessageAsync(L"UID 无效", L"UID 需要由 6–12 位数字组成。");
                     co_return;
                 }
+
+                if (probe.exactAccountIndex >= 0 &&
+                    probe.exactAccountIndex < static_cast<int>(m_core.Accounts().size()) &&
+                    m_core.Accounts()[static_cast<size_t>(probe.exactAccountIndex)].uid == uid)
+                {
+                    m_selectedIndex = probe.exactAccountIndex;
+                    RefreshUi(true, false);
+                    co_await ShowMessageAsync(L"已经保存", L"当前登录凭据与该 UID 的已保存账号完全一致。");
+                    co_return;
+                }
             }
 
-            if (probe.uidMatches.size() == 1)
+            std::vector<int> uidMatches = probe.uidMatches;
+            if (probe.uid.empty())
             {
-                int existingIndex = probe.uidMatches.front();
+                uidMatches.clear();
+                for (int i = 0; i < static_cast<int>(m_core.Accounts().size()); ++i)
+                {
+                    if (m_core.Accounts()[static_cast<size_t>(i)].uid == uid)
+                        uidMatches.push_back(i);
+                }
+            }
+
+            if (uidMatches.size() == 1)
+            {
+                int existingIndex = uidMatches.front();
                 auto existing = m_core.Accounts()[static_cast<size_t>(existingIndex)];
                 ContentDialog dialog;
                 dialog.XamlRoot(RootGrid().XamlRoot());
@@ -612,7 +632,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
                 }
                 if (choice != ContentDialogResult::Secondary) co_return;
             }
-            else if (probe.uidMatches.size() > 1 &&
+            else if (uidMatches.size() > 1 &&
                 !(co_await ConfirmAsync(
                     L"存在多条相同 UID 记录",
                     L"当前 UID 在已保存账号中有多条记录。继续后会把当前登录态另存为新记录。",
@@ -655,6 +675,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
             L"确定用当前注册表登录态更新“" + account.name + L"”吗？\nUID：" + account.uid,
             L"更新"))) co_return;
 
+        std::wstring failure;
         try
         {
             auto probe = m_core.ProbeCurrent();
@@ -675,8 +696,9 @@ namespace winrt::GenshinAccountSwitcher::implementation
         }
         catch (...)
         {
-            co_await ShowMessageAsync(L"更新失败", L"无法读取当前注册表登录态。");
+            failure = L"无法读取当前注册表登录态。";
         }
+        if (!failure.empty()) co_await ShowMessageAsync(L"更新失败", failure);
     }
 
     fire_and_forget MainWindow::RenameSelectedAsync()
