@@ -13,6 +13,7 @@
 #include <winrt/Windows.Data.Json.h>
 #include <winrt/Windows.UI.h>
 #include <winrt/Windows.UI.Text.h>
+#include <winrt/Microsoft.UI.Dispatching.h>
 #include <winrt/Microsoft.UI.Xaml.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.Primitives.h>
@@ -31,3 +32,4 @@
 #include <optional>
 #include <filesystem>
 #include <memory>
+#include <chrono>
