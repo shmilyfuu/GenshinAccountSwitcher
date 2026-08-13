@@ -32,6 +32,49 @@ namespace
                 SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
         }
     }
+
+    void ReserveSavedAccountSlots(Microsoft::UI::Xaml::Window const& window)
+    {
+        using namespace Microsoft::UI::Xaml;
+        using namespace Microsoft::UI::Xaml::Controls;
+
+        auto projected = window.as<winrt::GenshinAccountSwitcher::MainWindow>();
+        auto self = winrt::get_self<winrt::GenshinAccountSwitcher::implementation::MainWindow>(projected);
+        auto list = self->AccountsList();
+
+        for (auto const& value : list.Items())
+        {
+            auto item = value.try_as<ListViewItem>();
+            if (!item) continue;
+            auto card = item.Content().try_as<Border>();
+            if (!card) continue;
+            auto row = card.Child().try_as<Grid>();
+            if (!row) continue;
+
+            auto children = row.Children();
+            if (children.Size() >= 2)
+            {
+                if (auto uid = children.GetAt(1).try_as<TextBlock>())
+                {
+                    uid.Width(92);
+                    uid.HorizontalAlignment(HorizontalAlignment::Right);
+                    uid.TextAlignment(TextAlignment::Right);
+                    uid.TextTrimming(TextTrimming::None);
+                }
+            }
+
+            if (children.Size() == 3)
+            {
+                Border placeholder;
+                placeholder.Width(64);
+                placeholder.Height(1);
+                placeholder.Opacity(0.0);
+                placeholder.IsHitTestVisible(false);
+                Grid::SetColumn(placeholder, 2);
+                row.Children().Append(placeholder);
+            }
+        }
+    }
 }
 
 namespace winrt::GenshinAccountSwitcher::implementation
@@ -46,6 +89,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
         m_window = winrt::make<MainWindow>();
         m_window.Title(L"原神账号管理");
         PrepareInitialWindow(m_window);
+        ReserveSavedAccountSlots(m_window);
         m_window.Activate();
     }
 }
