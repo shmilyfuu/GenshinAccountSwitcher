@@ -6,7 +6,7 @@
 
 namespace
 {
-    void PrepareInitialWindow(Microsoft::UI::Xaml::Window const& window)
+    void PrepareInitialWindow(winrt::Microsoft::UI::Xaml::Window const& window)
     {
         HWND hwnd{};
         window.as<::IWindowNative>()->get_WindowHandle(&hwnd);
@@ -33,10 +33,10 @@ namespace
         }
     }
 
-    void ReserveSavedAccountSlots(Microsoft::UI::Xaml::Window const& window)
+    void ReserveSavedAccountSlots(winrt::Microsoft::UI::Xaml::Window const& window)
     {
-        using namespace Microsoft::UI::Xaml;
-        using namespace Microsoft::UI::Xaml::Controls;
+        using namespace winrt::Microsoft::UI::Xaml;
+        using namespace winrt::Microsoft::UI::Xaml::Controls;
 
         auto projected = window.as<winrt::GenshinAccountSwitcher::MainWindow>();
         auto self = winrt::get_self<winrt::GenshinAccountSwitcher::implementation::MainWindow>(projected);
