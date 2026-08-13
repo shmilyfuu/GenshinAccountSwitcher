@@ -1,0 +1,83 @@
+name: Build Native WinUI3
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ native-winui3 ]
+    paths:
+      - 'native-winui3/src/**'
+      - '.github/workflows/build-native-winui3.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Restore native packages
+        shell: pwsh
+        working-directory: .\native-winui3\src
+        run: |
+          nuget install Microsoft.WindowsAppSDK -Version 1.7.260224002 -OutputDirectory .\packages -NonInteractive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          nuget install Microsoft.Windows.CppWinRT -Version 3.0.260715.1 -OutputDirectory .\packages -NonInteractive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          nuget install Microsoft.Windows.SDK.BuildTools -Version 10.0.26100.8249 -OutputDirectory .\packages -NonInteractive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build x64 Release
+        shell: pwsh
+        working-directory: .\native-winui3\src
+        run: |
+          msbuild .\GenshinAccountSwitcherNative.sln /m /p:Configuration=Release /p:Platform=x64 /v:minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Inspect output
+        shell: pwsh
+        run: |
+          Get-ChildItem .\native-winui3\src\dist -File | Sort-Object Length -Descending | Format-Table Name,Length
+          if (!(Test-Path .\native-winui3\src\dist\GenshinAccountSwitcher.exe)) { throw 'EXE missing' }
+          if (!(Test-Path .\native-winui3\src\dist\resources.pri)) { throw 'resources.pri missing' }
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $dist = '.\native-winui3\src\dist'
+          Remove-Item "$dist\*.lib", "$dist\*.exp" -ErrorAction SilentlyContinue
+          $hash = (Get-FileHash "$dist\GenshinAccountSwitcher.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  GenshinAccountSwitcher.exe" | Set-Content -Encoding ascii "$dist\GenshinAccountSwitcher.exe.sha256"
+          @'
+          @echo off
+          setlocal
+          set "APP=%~dp0GenshinAccountSwitcher.exe"
+          set "LOG=%~dp0diagnostic.txt"
+          >"%LOG%" echo Diagnostic start: %date% %time%
+          >>"%LOG%" ver
+          start "" "%APP%"
+          timeout /t 6 /nobreak >nul
+          tasklist /fi "imagename eq GenshinAccountSwitcher.exe" >>"%LOG%" 2>&1
+          >>"%LOG%" echo.
+          >>"%LOG%" echo Recent Application Error events:
+          powershell -NoProfile -Command "Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='Application Error'; StartTime=(Get-Date).AddMinutes(-3)} -ErrorAction SilentlyContinue ^| Select-Object -First 8 TimeCreated,Id,Message ^| Format-List" >>"%LOG%" 2>&1
+          echo Created %LOG%
+          pause
+          '@ | Set-Content -Encoding ascii "$dist\diagnose.cmd"
+          Compress-Archive -Path "$dist\*" -DestinationPath .\GenshinAccountSwitcher-Native-WinUI3-phase1-x64.zip -Force
+          Get-Item .\GenshinAccountSwitcher-Native-WinUI3-phase1-x64.zip | Format-Table Name,Length
+
+      - name: Upload runtime artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GenshinAccountSwitcher-Native-WinUI3-phase1-x64
+          path: .\GenshinAccountSwitcher-Native-WinUI3-phase1-x64.zip
+          retention-days: 14
+          if-no-files-found: error

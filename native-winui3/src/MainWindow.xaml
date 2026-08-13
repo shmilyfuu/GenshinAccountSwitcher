@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="GenshinAccountSwitcher.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Activated="OnWindowActivated">
+
+    <Border x:Name="RootGrid" RequestedTheme="Dark" Background="#202020" Padding="20">
+      <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Margin="2,0,2,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="2">
+                <TextBlock Text="原神账号切换器" FontSize="24" FontWeight="SemiBold" />
+                <TextBlock Text="国服 · 本地登录态管理" FontSize="12" Opacity="0.62" />
+            </StackPanel>
+            <Button Grid.Column="1" Content="刷新" VerticalAlignment="Center" Click="OnRefreshClick" />
+        </Grid>
+
+        <Border Grid.Row="1" Background="#2B2B2B" BorderBrush="#3B3B3B" BorderThickness="1" CornerRadius="12" Padding="16" Margin="0,0,0,16">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Spacing="5">
+                    <TextBlock Text="当前注册表账号" FontSize="12" Opacity="0.60" />
+                    <TextBlock x:Name="CurrentAccountText" Text="正在读取…" FontSize="20" FontWeight="SemiBold" />
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <TextBlock x:Name="CurrentUidText" Text="UID —" FontSize="13" Opacity="0.72" />
+                        <TextBlock x:Name="CredentialStateText" Text="" FontSize="13" Foreground="#F2C94C" />
+                    </StackPanel>
+                </StackPanel>
+                <Border Grid.Column="1" x:Name="GameStateBadge" Background="#253746" CornerRadius="10" Padding="10,5" VerticalAlignment="Center">
+                    <TextBlock x:Name="GameStateText" Text="游戏未运行" FontSize="12" />
+                </Border>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="2" MinHeight="230">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Grid Margin="2,0,2,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="已保存账号" FontSize="15" FontWeight="SemiBold" />
+                <TextBlock Grid.Column="1" x:Name="AccountCountText" Text="0 个" FontSize="12" Opacity="0.60" VerticalAlignment="Center" />
+            </Grid>
+
+            <ListView x:Name="AccountsList"
+                      Grid.Row="1"
+                      SelectionMode="Single"
+                      IsItemClickEnabled="False"
+                      HorizontalContentAlignment="Stretch"
+                      MaxHeight="286"
+                      SelectionChanged="OnAccountSelectionChanged">
+            </ListView>
+
+            <Grid Grid.Row="2" Margin="0,12,0,8" ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Button x:Name="SwitchButton" Content="切换账号" HorizontalAlignment="Stretch" Click="OnSwitchClick" />
+                <Button x:Name="SwitchLaunchButton" Grid.Column="1" Content="切换并启动原神" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch" Click="OnSwitchLaunchClick" />
+            </Grid>
+
+            <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8">
+                <Button x:Name="AddButton" Content="添加当前账号" Click="OnAddClick" />
+                <Button x:Name="UpdateButton" Content="更新登录态" Click="OnUpdateClick" />
+                <Button x:Name="RenameButton" Content="重命名" Click="OnRenameClick" />
+                <Button x:Name="DeleteButton" Content="删除" Click="OnDeleteClick" />
+                <Button x:Name="RestoreButton" Content="恢复上一次状态" Click="OnRestoreClick" />
+            </StackPanel>
+        </Grid>
+
+        <Border Grid.Row="3" Background="#292929" BorderBrush="#393939" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,16,0,10">
+            <Grid ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="游戏路径" FontSize="12" Opacity="0.62" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" x:Name="GamePathText" Text="正在检测…" FontSize="12" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                <Button Grid.Column="2" Content="指定 YuanShen.exe" Click="OnSelectGamePathClick" />
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="StatusText" Text="准备就绪" FontSize="12" Opacity="0.68" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" x:Name="DataPathText" Text="data\" FontSize="11" Opacity="0.45" VerticalAlignment="Center" />
+        </Grid>
+      </Grid>
+    </Border>
+</Window>
