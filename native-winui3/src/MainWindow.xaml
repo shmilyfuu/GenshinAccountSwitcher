@@ -142,26 +142,20 @@
                         Click="OnSwitchLaunchClick" />
             </Grid>
 
-            <Border Grid.Row="4"
-                    Margin="0,12,0,0"
-                    MinHeight="40"
-                    Padding="12,8"
-                    Background="{ThemeResource ControlFillColorDefaultBrush}"
-                    BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
-                    BorderThickness="1"
-                    CornerRadius="{ThemeResource ControlCornerRadius}">
-                <TextBlock x:Name="StatusText"
-                           Text="游戏未运行"
-                           Style="{StaticResource CaptionTextBlockStyle}"
-                           Opacity="0.78"
-                           VerticalAlignment="Center"
-                           TextWrapping="Wrap"
-                           Visibility="Visible" />
-            </Border>
+            <TextBlock x:Name="StatusText"
+                       Grid.Row="4"
+                       Margin="0,8,0,0"
+                       MinHeight="20"
+                       Text="游戏未运行"
+                       Style="{StaticResource CaptionTextBlockStyle}"
+                       Opacity="0.70"
+                       VerticalAlignment="Center"
+                       TextWrapping="Wrap"
+                       Visibility="Visible" />
 
             <!-- Existing controller code writes account-specific notices to this name.
                  Keep it in the tree for compatibility, but all visible notices are mirrored
-                 into the permanent status bar by WindowEnhancements.cpp. -->
+                 into the permanent status line by WindowEnhancements.cpp. -->
             <TextBlock x:Name="CredentialStateText"
                        Grid.Row="0"
                        Height="0"
