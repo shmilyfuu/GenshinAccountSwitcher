@@ -81,6 +81,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
             CurrentAccountText().Text(L"初始化失败");
             CurrentUidText().Text(L"UID —");
             CredentialStateText().Text(L"");
+            CredentialStateText().Visibility(Visibility::Collapsed);
             AddButton().Visibility(Visibility::Collapsed);
             SetStatus(L"程序目录不可写，或本地数据无法读取。请把程序移动到普通可写目录后重试。");
             UpdateButtonStates();
@@ -102,8 +103,8 @@ namespace winrt::GenshinAccountSwitcher::implementation
         auto dpi = GetDpiForWindow(hwnd);
         double scale = static_cast<double>(dpi) / 96.0;
         SetWindowPos(hwnd, nullptr, 0, 0,
-            static_cast<int>(740 * scale),
-            static_cast<int>(590 * scale),
+            static_cast<int>(700 * scale),
+            static_cast<int>(520 * scale),
             SWP_NOMOVE | SWP_NOZORDER);
     }
 
@@ -132,6 +133,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
     void MainWindow::SetStatus(std::wstring const& text)
     {
         StatusText().Text(H(text));
+        StatusText().Visibility(text.empty() ? Visibility::Collapsed : Visibility::Visible);
     }
 
     bool MainWindow::IdentitySnapshotEquals(gas::RegistrySnapshot const& a, gas::RegistrySnapshot const& b) noexcept
@@ -189,6 +191,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
 
             CurrentUidText().Text(m_currentState.uid.empty() ? L"UID —" : H(L"UID " + m_currentState.uid));
             CredentialStateText().Text(L"");
+            CredentialStateText().Visibility(Visibility::Collapsed);
 
             switch (m_currentState.matchKind)
             {
@@ -203,16 +206,19 @@ namespace winrt::GenshinAccountSwitcher::implementation
                 CredentialStateText().Text(running
                     ? L"登录信息已变化，游戏退出后将自动同步"
                     : L"登录信息已变化，正在等待自动同步");
+                CredentialStateText().Visibility(Visibility::Visible);
                 break;
 
             case gas::CurrentMatchKind::AmbiguousUid:
                 CurrentAccountText().Text(L"UID 已保存（存在多条记录）");
                 CredentialStateText().Text(L"无法自动判断对应记录，请在更多操作中手动处理");
+                CredentialStateText().Visibility(Visibility::Visible);
                 break;
 
             case gas::CurrentMatchKind::Inconsistent:
                 CurrentAccountText().Text(L"登录状态正在变化…");
                 CredentialStateText().Text(L"UID 与登录凭据暂时不一致，程序不会自动写入");
+                CredentialStateText().Visibility(Visibility::Visible);
                 break;
 
             default:
@@ -250,19 +256,19 @@ namespace winrt::GenshinAccountSwitcher::implementation
         AccountVisual v;
         v.item = ListViewItem();
         v.item.HorizontalContentAlignment(HorizontalAlignment::Stretch);
-        v.item.Padding(MakeThickness(0, 0, 0, 0));
         v.item.MinHeight(48);
 
         v.card = Border();
-        v.card.CornerRadius(CornerRadius{ 6 });
-        v.card.BorderThickness(Thickness{ 1 });
-        v.card.Padding(MakeThickness(12, 0, 12, 0));
+        v.card.CornerRadius(CornerRadius{ 4 });
+        v.card.BorderThickness(Thickness{ 0 });
+        v.card.Padding(MakeThickness(16, 0, 12, 0));
+        v.card.Background(MakeBrush(0x00, 0, 0, 0));
 
         Grid row;
         row.Height(48);
         ColumnDefinition c0; c0.Width(GridLength{ 1, GridUnitType::Star });
         ColumnDefinition c1; c1.Width(GridLength{ 150, GridUnitType::Pixel });
-        ColumnDefinition c2; c2.Width(GridLength{ 116, GridUnitType::Pixel });
+        ColumnDefinition c2; c2.Width(GridLength{ 100, GridUnitType::Pixel });
         row.ColumnDefinitions().Append(c0);
         row.ColumnDefinitions().Append(c1);
         row.ColumnDefinitions().Append(c2);
@@ -283,16 +289,15 @@ namespace winrt::GenshinAccountSwitcher::implementation
         row.Children().Append(uid);
 
         v.badge = Border();
-        v.badge.CornerRadius(CornerRadius{ 9 });
-        v.badge.Padding(MakeThickness(9, 3, 9, 3));
+        v.badge.CornerRadius(CornerRadius{ 4 });
+        v.badge.Padding(MakeThickness(8, 2, 8, 2));
         v.badge.HorizontalAlignment(HorizontalAlignment::Left);
         v.badge.VerticalAlignment(VerticalAlignment::Center);
         v.badge.Visibility(Visibility::Collapsed);
-        v.badge.Background(MakeBrush(0xFF, 0x1F, 0x45, 0x57));
 
         v.badgeText = TextBlock();
         v.badgeText.FontSize(11);
-        v.badgeText.FontWeight(Windows::UI::Text::FontWeights::SemiBold());
+        v.badgeText.Opacity(0.72);
         v.badgeText.Text(L"当前账号");
         v.badge.Child(v.badgeText);
         Grid::SetColumn(v.badge, 2);
@@ -326,17 +331,10 @@ namespace winrt::GenshinAccountSwitcher::implementation
         for (int i = 0; i < static_cast<int>(m_visuals.size()); ++i)
         {
             auto& visual = m_visuals[static_cast<size_t>(i)];
-            bool selected = i == m_selectedIndex;
             bool current = i == m_currentState.accountIndex &&
                 (m_currentState.matchKind == gas::CurrentMatchKind::ExactCredential ||
                  m_currentState.matchKind == gas::CurrentMatchKind::UniqueUidCredentialChanged);
 
-            visual.card.Background(selected
-                ? MakeBrush(0xFF, 0x36, 0x36, 0x36)
-                : MakeBrush(0xFF, 0x29, 0x29, 0x29));
-            visual.card.BorderBrush(selected
-                ? MakeBrush(0xFF, 0x5C, 0x5C, 0x5C)
-                : MakeBrush(0xFF, 0x39, 0x39, 0x39));
             visual.badge.Visibility(current ? Visibility::Visible : Visibility::Collapsed);
         }
     }
@@ -355,7 +353,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
             m_selectedIndex < static_cast<int>(m_core.Accounts().size());
 
         SwitchButton().IsEnabled(selected);
-        SwitchLaunchButton().IsEnabled(selected);
+        SwitchLaunchButton().IsEnabled(m_initialized);
         UpdateMenuItem().IsEnabled(selected);
         RenameMenuItem().IsEnabled(selected);
         DeleteMenuItem().IsEnabled(selected);
@@ -530,7 +528,28 @@ namespace winrt::GenshinAccountSwitcher::implementation
     void MainWindow::OnRenameClick(IInspectable const&, RoutedEventArgs const&) { RenameSelectedAsync(); }
     void MainWindow::OnDeleteClick(IInspectable const&, RoutedEventArgs const&) { DeleteSelectedAsync(); }
     void MainWindow::OnSwitchClick(IInspectable const&, RoutedEventArgs const&) { SwitchSelectedAsync(false); }
-    void MainWindow::OnSwitchLaunchClick(IInspectable const&, RoutedEventArgs const&) { SwitchSelectedAsync(true); }
+    void MainWindow::OnSwitchLaunchClick(IInspectable const&, RoutedEventArgs const&)
+    {
+        if (!m_initialized) return;
+        try
+        {
+            if (m_core.IsGameRunning())
+            {
+                SetStatus(L"原神已经运行。");
+                return;
+            }
+
+            auto launch = m_core.LaunchGame();
+            if (!launch.success)
+                ShowMessage(L"启动失败", launch.message);
+            else
+                SetStatus(L"已启动原神。");
+        }
+        catch (...)
+        {
+            ShowMessage(L"启动失败", L"启动原神时发生异常。");
+        }
+    }
     void MainWindow::OnRestoreClick(IInspectable const&, RoutedEventArgs const&) { RestoreAsync(); }
 
     fire_and_forget MainWindow::AddCurrentAsync()
