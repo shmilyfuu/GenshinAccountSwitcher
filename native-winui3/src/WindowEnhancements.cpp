@@ -2,11 +2,8 @@
 #include "MainWindow.xaml.h"
 #include "resource.h"
 
-#include <commctrl.h>
 #include <tlhelp32.h>
 #include <cmath>
-
-#pragma comment(lib, "Comctl32.lib")
 
 using namespace winrt;
 using namespace Microsoft::UI::Xaml;
@@ -16,8 +13,6 @@ using namespace Windows::UI;
 
 namespace
 {
-    constexpr UINT kTrackedGameExitedMessage = WM_APP + 0x45;
-    constexpr UINT_PTR kWindowSubclassId = 0x4741534Du;
     constexpr ULONGLONG kTransientStatusMilliseconds = 6000;
 
     SolidColorBrush MakeFallbackBrush(uint8_t a, uint8_t r, uint8_t g, uint8_t b)
@@ -35,6 +30,11 @@ namespace
         catch (...) {}
         return fallback;
     }
+
+    bool IsUnitStar(GridLength const& value) noexcept
+    {
+        return value.GridUnitType == GridUnitType::Star && std::abs(value.Value - 1.0) < 0.001;
+    }
 }
 
 namespace winrt::GenshinAccountSwitcher::implementation
@@ -44,30 +44,45 @@ namespace winrt::GenshinAccountSwitcher::implementation
         if (m_enhancementsInitialized) return;
         m_enhancementsInitialized = true;
 
-        Title(L"原神账号管理");
-        ConfigureFixedWindow();
-        ApplyWindowIcon();
-
-        if (m_monitorTimer)
+        try
         {
-            m_monitorTimer.Stop();
-        }
+            Title(L"原神账号管理");
+            ConfigureFixedWindow();
+            ApplyWindowIcon();
 
-        auto hwnd = WindowHandle();
-        if (hwnd)
+            // Phase 1-3 used a one-second full process enumeration timer. Stop it after
+            // the enhanced monitor is ready so only one monitor owns the game lifecycle.
+            if (m_monitorTimer)
+            {
+                m_monitorTimer.Stop();
+            }
+
+            // LayoutUpdated is retained only as a way to catch newly rebuilt account rows.
+            // NormalizeAccountRows is intentionally idempotent: once a row is normalized,
+            // it performs no further layout mutations, preventing the Phase 4 layout loop.
+            AccountsList().LayoutUpdated({ this, &MainWindow::OnAccountsLayoutUpdated });
+
+            // Existing controller code calls SetStatus. This callback keeps those messages
+            // visible for a short period before the permanent base status returns.
+            m_statusTextCallbackToken = StatusText().RegisterPropertyChangedCallback(
+                TextBlock::TextProperty(),
+                { this, &MainWindow::OnStatusTextPropertyChanged });
+
+            NormalizeAccountRows();
+            StartEnhancedMonitoring();
+            RefreshUnifiedStatus(true);
+        }
+        catch (...)
         {
-            SetWindowSubclass(hwnd, &MainWindow::WindowSubclassProc, kWindowSubclassId,
-                reinterpret_cast<DWORD_PTR>(this));
+            // UI enhancement failure must never terminate the account manager. The core
+            // functionality remains usable and the old monitor can continue as fallback.
+            if (m_monitorTimer && !m_monitorTimer.IsRunning())
+            {
+                m_monitorTimer.Start();
+            }
+            StatusText().Text(L"界面增强初始化失败，已回退到基础监测模式。");
+            StatusText().Visibility(Visibility::Visible);
         }
-
-        AccountsList().LayoutUpdated({ this, &MainWindow::OnAccountsLayoutUpdated });
-        m_statusTextCallbackToken = StatusText().RegisterPropertyChangedCallback(
-            TextBlock::TextProperty(),
-            { this, &MainWindow::OnStatusTextPropertyChanged });
-
-        NormalizeAccountRows();
-        StartEnhancedMonitoring();
-        RefreshUnifiedStatus(true);
     }
 
     void MainWindow::ConfigureFixedWindow()
@@ -85,13 +100,14 @@ namespace winrt::GenshinAccountSwitcher::implementation
             DrawMenuBar(hwnd);
         }
 
+        // Requested dimensions are the client area, excluding the title bar/frame.
         UINT dpi = GetDpiForWindow(hwnd);
         double scale = static_cast<double>(dpi) / 96.0;
         RECT rect{
             0,
             0,
-            static_cast<LONG>(std::lround(720.0 * scale)),
-            static_cast<LONG>(std::lround(960.0 * scale))
+            static_cast<LONG>(std::lround(315.0 * scale)),
+            static_cast<LONG>(std::lround(560.0 * scale))
         };
 
         auto exStyle = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
@@ -153,13 +169,31 @@ namespace winrt::GenshinAccountSwitcher::implementation
         for (auto& visual : m_visuals)
         {
             if (!visual.card) continue;
-            visual.card.Padding(Thickness{ 16, 0, 16, 0 });
-            visual.card.CornerRadius(CornerRadius{ 4 });
-
             auto row = visual.card.Child().try_as<Grid>();
             if (!row) continue;
 
             auto columns = row.ColumnDefinitions();
+            bool alreadyNormalized = columns.Size() == 3;
+            if (alreadyNormalized)
+            {
+                for (uint32_t i = 0; i < 3; ++i)
+                {
+                    if (!IsUnitStar(columns.GetAt(i).Width()))
+                    {
+                        alreadyNormalized = false;
+                        break;
+                    }
+                }
+            }
+
+            // Critical: do not write any layout property when the row already has the
+            // requested shape. Re-writing columns from LayoutUpdated would schedule another
+            // layout pass indefinitely.
+            if (alreadyNormalized) continue;
+
+            visual.card.Padding(Thickness{ 16, 0, 16, 0 });
+            visual.card.CornerRadius(CornerRadius{ 4 });
+
             columns.Clear();
             for (int i = 0; i < 3; ++i)
             {
@@ -187,6 +221,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
                     uid.HorizontalAlignment(HorizontalAlignment::Center);
                     uid.VerticalAlignment(VerticalAlignment::Center);
                     uid.TextAlignment(TextAlignment::Center);
+                    uid.TextTrimming(TextTrimming::CharacterEllipsis);
                 }
             }
 
@@ -196,7 +231,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
                 visual.badge.HorizontalAlignment(HorizontalAlignment::Right);
                 visual.badge.VerticalAlignment(VerticalAlignment::Center);
                 visual.badge.CornerRadius(CornerRadius{ 4 });
-                visual.badge.Padding(Thickness{ 8, 2, 8, 2 });
+                visual.badge.Padding(Thickness{ 6, 2, 6, 2 });
                 visual.badge.Background(secondaryAccent);
             }
             if (visual.badgeText)
@@ -241,15 +276,18 @@ namespace winrt::GenshinAccountSwitcher::implementation
         auto queue = DispatcherQueue();
         if (!queue) return;
 
-        m_gameWasRunning = false;
         ReleaseTrackedGameProcess();
+        m_gameWasRunning = false;
 
+        // A low-frequency full scan only discovers games started from any external entry.
         m_processDiscoveryTimer = queue.CreateTimer();
         m_processDiscoveryTimer.Interval(std::chrono::milliseconds(2000));
         m_processDiscoveryTimer.IsRepeating(true);
         m_processDiscoveryTimer.Tick({ this, &MainWindow::OnProcessDiscoveryTick });
         m_processDiscoveryTimer.Start();
 
+        // Once a process is found, this timer checks the retained process handle. It does
+        // not enumerate all processes, and detects exit within roughly half a second.
         m_statusTimer = queue.CreateTimer();
         m_statusTimer.Interval(std::chrono::milliseconds(500));
         m_statusTimer.IsRepeating(true);
@@ -283,61 +321,18 @@ namespace winrt::GenshinAccountSwitcher::implementation
         HANDLE process = OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
         if (!process) return;
 
-        HANDLE waitHandle{};
-        if (!RegisterWaitForSingleObject(
-            &waitHandle,
-            process,
-            &MainWindow::GameExitWaitCallback,
-            reinterpret_cast<PVOID>(WindowHandle()),
-            INFINITE,
-            WT_EXECUTEONLYONCE))
-        {
-            CloseHandle(process);
-            return;
-        }
-
         m_trackedGameProcess = process;
-        m_gameExitWait = waitHandle;
         m_trackedGamePid = pid;
         m_gameWasRunning = true;
         RefreshUi(false, false);
         RefreshUnifiedStatus(true);
     }
 
-    VOID CALLBACK MainWindow::GameExitWaitCallback(PVOID context, BOOLEAN)
-    {
-        auto hwnd = reinterpret_cast<HWND>(context);
-        if (hwnd) PostMessageW(hwnd, kTrackedGameExitedMessage, 0, 0);
-    }
-
-    LRESULT CALLBACK MainWindow::WindowSubclassProc(
-        HWND hwnd,
-        UINT message,
-        WPARAM wParam,
-        LPARAM lParam,
-        UINT_PTR subclassId,
-        DWORD_PTR referenceData)
-    {
-        auto self = reinterpret_cast<MainWindow*>(referenceData);
-        if (message == kTrackedGameExitedMessage && self)
-        {
-            self->OnTrackedGameExited();
-            return 0;
-        }
-        if (message == WM_NCDESTROY)
-        {
-            RemoveWindowSubclass(hwnd, &MainWindow::WindowSubclassProc, subclassId);
-        }
-        return DefSubclassProc(hwnd, message, wParam, lParam);
-    }
-
     void MainWindow::ReleaseTrackedGameProcess()
     {
-        if (m_gameExitWait)
-        {
-            UnregisterWaitEx(m_gameExitWait, nullptr);
-            m_gameExitWait = nullptr;
-        }
+        // Phase 5 no longer registers a thread-pool wait or subclasses the WinUI HWND.
+        // Keep the legacy member clear for binary/source compatibility with the header.
+        m_gameExitWait = nullptr;
         if (m_trackedGameProcess)
         {
             CloseHandle(m_trackedGameProcess);
@@ -352,7 +347,6 @@ namespace winrt::GenshinAccountSwitcher::implementation
         m_gameWasRunning = false;
         SetStatus(L"游戏已退出，正在同步账号状态…");
         SettleAndReconcileAsync(false);
-        RefreshUnifiedStatus(false);
     }
 
     void MainWindow::OnStatusTextPropertyChanged(DependencyObject const&, DependencyProperty const&)
@@ -367,6 +361,21 @@ namespace winrt::GenshinAccountSwitcher::implementation
 
     void MainWindow::OnStatusTimerTick(Microsoft::UI::Dispatching::DispatcherQueueTimer const&, IInspectable const&)
     {
+        if (m_trackedGameProcess)
+        {
+            DWORD waitResult = WaitForSingleObject(m_trackedGameProcess, 0);
+            if (waitResult == WAIT_OBJECT_0)
+            {
+                OnTrackedGameExited();
+                return;
+            }
+            if (waitResult == WAIT_FAILED)
+            {
+                ReleaseTrackedGameProcess();
+                m_gameWasRunning = false;
+            }
+        }
+
         RefreshUnifiedStatus(false);
     }
 
