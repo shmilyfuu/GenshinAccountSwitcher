@@ -45,7 +45,8 @@ namespace gas
         None,
         ExactCredential,
         UniqueUidCredentialChanged,
-        AmbiguousUid
+        AmbiguousUid,
+        Inconsistent
     };
 
     struct CurrentState
@@ -86,10 +87,12 @@ namespace gas
         std::vector<AccountProfile> const& Accounts() const noexcept { return m_accounts; }
         std::filesystem::path const& BaseDirectory() const noexcept { return m_baseDirectory; }
         std::filesystem::path const& DataDirectory() const noexcept { return m_dataDirectory; }
+        std::filesystem::path const& LogFile() const noexcept { return m_logFile; }
         bool RecoveryExists() const;
 
         CurrentState DetectCurrentState();
         CurrentProbe ProbeCurrent();
+        CurrentState ClassifyProbe(CurrentProbe const& probe) const;
 
         int SaveNewAccount(std::wstring const& name, std::wstring const& uid, RegistrySnapshot const& snapshot);
         OperationResult UpdateAccount(int index, RegistrySnapshot const& snapshot);
@@ -105,11 +108,13 @@ namespace gas
         bool IsGameRunning() const;
         static std::wstring ParseUid(RegistryValueBlob const& blob);
         static bool IsNumericUid(std::wstring const& uid);
+        static bool IdentitySnapshotEquals(RegistrySnapshot const& a, RegistrySnapshot const& b) noexcept;
 
     private:
         std::filesystem::path m_baseDirectory;
         std::filesystem::path m_dataDirectory;
         std::filesystem::path m_accountsDirectory;
+        std::filesystem::path m_previousAccountsDirectory;
         std::filesystem::path m_recoveryDirectory;
         std::filesystem::path m_logsDirectory;
         std::filesystem::path m_accountsFile;
@@ -120,11 +125,14 @@ namespace gas
 
         RegistrySnapshot ReadRegistrySnapshot() const;
         void WriteRegistryValue(wchar_t const* name, RegistryValueBlob const& value) const;
+        bool RestoreSnapshotNoThrow(RegistrySnapshot const& snapshot) const noexcept;
 
         std::filesystem::path CredentialFile(GUID const& id) const;
+        std::filesystem::path PreviousCredentialFile(GUID const& id) const;
         void SaveCredential(GUID const& id, RegistrySnapshot const& snapshot) const;
         RegistrySnapshot LoadCredential(GUID const& id) const;
         void DeleteCredential(GUID const& id) const;
+        void SavePreviousCredential(GUID const& id, RegistrySnapshot const& snapshot) const;
 
         void SaveRecovery(RegistrySnapshot const& snapshot) const;
         RegistrySnapshot LoadRecovery() const;
