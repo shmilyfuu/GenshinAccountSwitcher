@@ -36,6 +36,11 @@ namespace
     {
         return value.GridUnitType == GridUnitType::Star && std::abs(value.Value - 1.0) < 0.001;
     }
+
+    bool IsAuto(GridLength const& value) noexcept
+    {
+        return value.GridUnitType == GridUnitType::Auto;
+    }
 }
 
 namespace winrt::GenshinAccountSwitcher::implementation
@@ -51,20 +56,13 @@ namespace winrt::GenshinAccountSwitcher::implementation
             ConfigureFixedWindow();
             ApplyWindowIcon();
 
-            // Phase 1-3 used a one-second full process enumeration timer. Stop it after
-            // the enhanced monitor is ready so only one monitor owns the game lifecycle.
             if (m_monitorTimer)
             {
                 m_monitorTimer.Stop();
             }
 
-            // LayoutUpdated is retained only as a way to catch newly rebuilt account rows.
-            // NormalizeAccountRows is intentionally idempotent: once a row is normalized,
-            // it performs no further layout mutations, preventing the Phase 4 layout loop.
             AccountsList().LayoutUpdated({ this, &MainWindow::OnAccountsLayoutUpdated });
 
-            // Existing controller code calls SetStatus. This callback keeps those messages
-            // visible for a short period before the permanent base status returns.
             m_statusTextCallbackToken = StatusText().RegisterPropertyChangedCallback(
                 TextBlock::TextProperty(),
                 { this, &MainWindow::OnStatusTextPropertyChanged });
@@ -75,8 +73,6 @@ namespace winrt::GenshinAccountSwitcher::implementation
         }
         catch (...)
         {
-            // UI enhancement failure must never terminate the account manager. The core
-            // functionality remains usable and the old monitor can continue as fallback.
             if (m_monitorTimer && !m_monitorTimer.IsRunning())
             {
                 m_monitorTimer.Start();
@@ -101,14 +97,13 @@ namespace winrt::GenshinAccountSwitcher::implementation
             DrawMenuBar(hwnd);
         }
 
-        // Requested dimensions are the client area, excluding the title bar/frame.
         UINT dpi = GetDpiForWindow(hwnd);
         double scale = static_cast<double>(dpi) / 96.0;
         RECT rect{
             0,
             0,
-            static_cast<LONG>(std::lround(315.0 * scale)),
-            static_cast<LONG>(std::lround(560.0 * scale))
+            static_cast<LONG>(std::lround(320.0 * scale)),
+            static_cast<LONG>(std::lround(480.0 * scale))
         };
 
         auto exStyle = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
@@ -149,8 +144,6 @@ namespace winrt::GenshinAccountSwitcher::implementation
             instance, MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON,
             bigCx, bigCy, LR_DEFAULTCOLOR | LR_SHARED));
 
-        // WinUI 3 owns the top-level window presentation through AppWindow. Use its icon
-        // API first so the system title bar and taskbar receive the same embedded icon.
         if (bigIcon)
         {
             try
@@ -159,12 +152,12 @@ namespace winrt::GenshinAccountSwitcher::implementation
                 auto appWindow = Microsoft::UI::Windowing::AppWindow::GetFromWindowId(windowId);
                 auto iconId = Microsoft::UI::GetIconIdFromIcon(bigIcon);
                 appWindow.SetIcon(iconId);
-                return;
             }
             catch (...) {}
         }
 
-        // Keep the traditional messages as a compatibility fallback.
+        // Also update the underlying HWND. With a valid embedded multi-size ICO this keeps
+        // the classic window icon and WinUI AppWindow icon consistent across shell surfaces.
         if (smallIcon) SendMessageW(hwnd, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(smallIcon));
         if (bigIcon) SendMessageW(hwnd, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(bigIcon));
     }
@@ -190,35 +183,35 @@ namespace winrt::GenshinAccountSwitcher::implementation
             if (!row) continue;
 
             auto columns = row.ColumnDefinitions();
-            bool alreadyNormalized = columns.Size() == 3;
-            if (alreadyNormalized)
-            {
-                for (uint32_t i = 0; i < 3; ++i)
-                {
-                    if (!IsUnitStar(columns.GetAt(i).Width()))
-                    {
-                        alreadyNormalized = false;
-                        break;
-                    }
-                }
-            }
+            bool alreadyNormalized =
+                columns.Size() == 3 &&
+                IsUnitStar(columns.GetAt(0).Width()) &&
+                IsAuto(columns.GetAt(1).Width()) &&
+                IsAuto(columns.GetAt(2).Width());
 
-            // Do not write any layout property when the row already has the requested
-            // shape. Re-writing columns from LayoutUpdated would schedule another layout pass.
             if (alreadyNormalized) continue;
 
-            // Keep a symmetric safe area inside the actual ListViewItem content bounds.
-            // The selection indicator and an auto-visible scroll bar remain owned by WinUI.
-            visual.card.Padding(Thickness{ 12, 0, 12, 0 });
-            visual.card.CornerRadius(CornerRadius{ 4 });
+            // C++/WinRT CornerRadius is a four-field struct. A single aggregate value only
+            // initializes TopLeft, which was the reason the badge previously had one rounded
+            // corner. Always specify all four corners explicitly for code-created elements.
+            visual.item.Padding(Thickness{ 0, 0, 0, 0 });
+            visual.card.Padding(Thickness{ 16, 0, 16, 0 });
+            visual.card.CornerRadius(CornerRadius{ 4, 4, 4, 4 });
 
+            row.ColumnSpacing(16);
             columns.Clear();
-            for (int i = 0; i < 3; ++i)
-            {
-                ColumnDefinition column;
-                column.Width(GridLength{ 1.0, GridUnitType::Star });
-                columns.Append(column);
-            }
+
+            ColumnDefinition nameColumn;
+            nameColumn.Width(GridLength{ 1.0, GridUnitType::Star });
+            columns.Append(nameColumn);
+
+            ColumnDefinition uidColumn;
+            uidColumn.Width(GridLength{ 1.0, GridUnitType::Auto });
+            columns.Append(uidColumn);
+
+            ColumnDefinition badgeColumn;
+            badgeColumn.Width(GridLength{ 1.0, GridUnitType::Auto });
+            columns.Append(badgeColumn);
 
             auto children = row.Children();
             if (children.Size() >= 1)
@@ -236,10 +229,10 @@ namespace winrt::GenshinAccountSwitcher::implementation
                 if (auto uid = children.GetAt(1).try_as<TextBlock>())
                 {
                     Grid::SetColumn(uid, 1);
-                    uid.HorizontalAlignment(HorizontalAlignment::Center);
+                    uid.HorizontalAlignment(HorizontalAlignment::Right);
                     uid.VerticalAlignment(VerticalAlignment::Center);
-                    uid.TextAlignment(TextAlignment::Center);
-                    uid.TextTrimming(TextTrimming::CharacterEllipsis);
+                    uid.TextAlignment(TextAlignment::Right);
+                    uid.TextTrimming(TextTrimming::None);
                 }
             }
 
@@ -248,9 +241,9 @@ namespace winrt::GenshinAccountSwitcher::implementation
                 Grid::SetColumn(visual.badge, 2);
                 visual.badge.HorizontalAlignment(HorizontalAlignment::Right);
                 visual.badge.VerticalAlignment(VerticalAlignment::Center);
-                visual.badge.CornerRadius(CornerRadius{ 4 });
+                visual.badge.CornerRadius(CornerRadius{ 4, 4, 4, 4 });
                 visual.badge.Padding(Thickness{ 6, 2, 6, 2 });
-                visual.badge.Margin(Thickness{ 0, 0, 2, 0 });
+                visual.badge.Margin(Thickness{ 0, 0, 0, 0 });
                 visual.badge.Background(badgeBackground);
             }
             if (visual.badgeText)
@@ -298,15 +291,12 @@ namespace winrt::GenshinAccountSwitcher::implementation
         ReleaseTrackedGameProcess();
         m_gameWasRunning = false;
 
-        // A low-frequency full scan only discovers games started from any external entry.
         m_processDiscoveryTimer = queue.CreateTimer();
         m_processDiscoveryTimer.Interval(std::chrono::milliseconds(2000));
         m_processDiscoveryTimer.IsRepeating(true);
         m_processDiscoveryTimer.Tick({ this, &MainWindow::OnProcessDiscoveryTick });
         m_processDiscoveryTimer.Start();
 
-        // Once a process is found, this timer checks the retained process handle. It does
-        // not enumerate all processes, and detects exit within roughly half a second.
         m_statusTimer = queue.CreateTimer();
         m_statusTimer.Interval(std::chrono::milliseconds(500));
         m_statusTimer.IsRepeating(true);
@@ -349,8 +339,6 @@ namespace winrt::GenshinAccountSwitcher::implementation
 
     void MainWindow::ReleaseTrackedGameProcess()
     {
-        // Phase 5 no longer registers a thread-pool wait or subclasses the WinUI HWND.
-        // Keep the legacy member clear for binary/source compatibility with the header.
         m_gameExitWait = nullptr;
         if (m_trackedGameProcess)
         {
