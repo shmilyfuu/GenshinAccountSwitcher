@@ -90,6 +90,7 @@
   <ItemGroup>
     <ClInclude Include="pch.h" />
     <ClInclude Include="NativeCore.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="App.xaml.h"><DependentUpon>App.xaml</DependentUpon></ClInclude>
     <ClInclude Include="MainWindow.xaml.h"><DependentUpon>MainWindow.xaml</DependentUpon></ClInclude>
   </ItemGroup>
@@ -100,16 +101,21 @@
   <ItemGroup>
     <ClCompile Include="pch.cpp"><PrecompiledHeader>Create</PrecompiledHeader></ClCompile>
     <ClCompile Include="NativeCore.cpp" />
+    <ClCompile Include="WindowEnhancements.cpp" />
     <ClCompile Include="App.xaml.cpp"><DependentUpon>App.xaml</DependentUpon></ClCompile>
     <ClCompile Include="MainWindow.xaml.cpp"><DependentUpon>MainWindow.xaml</DependentUpon></ClCompile>
     <ClCompile Include="$(GeneratedFilesDir)module.g.cpp" />
   </ItemGroup>
+  <ItemGroup><ResourceCompile Include="AppIcon.rc" /></ItemGroup>
   <ItemGroup><Midl Include="Project.idl"><SubType>Code</SubType></Midl></ItemGroup>
   <ItemGroup><PRIResource Include="Resources.resw" /></ItemGroup>
   <ItemGroup>
     <Reference Include="$(NugetPackageDirectory)\Microsoft.Web.WebView2.1.0.2903.40\lib\Microsoft.Web.WebView2.Core.winmd" />
   </ItemGroup>
-  <ItemGroup><None Include="README.txt" /></ItemGroup>
+  <ItemGroup>
+    <None Include="README.txt" />
+    <None Include="Assets\AppIcon.b64.part.*" />
+  </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
@@ -117,6 +123,10 @@
     <Import Project="$(NugetPackageDirectory)\Microsoft.Windows.SDK.BuildTools.10.0.26100.8249\build\Microsoft.Windows.SDK.BuildTools.targets" Condition="Exists('$(NugetPackageDirectory)\Microsoft.Windows.SDK.BuildTools.10.0.26100.8249\build\Microsoft.Windows.SDK.BuildTools.targets')" />
     <Import Project="$(NugetPackageDirectory)\Microsoft.WindowsAppSDK.1.7.260224002\build\native\Microsoft.WindowsAppSDK.targets" Condition="Exists('$(NugetPackageDirectory)\Microsoft.WindowsAppSDK.1.7.260224002\build\native\Microsoft.WindowsAppSDK.targets')" />
   </ImportGroup>
+
+  <Target Name="DecodeApplicationIcon" BeforeTargets="PrepareForBuild">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;$parts = Get-ChildItem -LiteralPath '$(ProjectDir)Assets' -Filter 'AppIcon.b64.part.*' | Sort-Object Name; if (-not $parts) { throw 'Application icon source parts are missing.' }; $b64 = (($parts | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw }) -join '') -replace '\s',''; [IO.File]::WriteAllBytes('$(ProjectDir)Assets\AppIcon.ico',[Convert]::FromBase64String($b64))&quot;" />
+  </Target>
 
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <Error Condition="!Exists('$(NugetPackageDirectory)\Microsoft.WindowsAppSDK.1.7.260224002\build\native\Microsoft.WindowsAppSDK.props')" Text="Microsoft.WindowsAppSDK 1.7 package is missing." />
