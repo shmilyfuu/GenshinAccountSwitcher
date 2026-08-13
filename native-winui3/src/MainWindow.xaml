@@ -8,7 +8,7 @@
     <Border x:Name="RootGrid"
             RequestedTheme="Dark"
             Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
-            Padding="20">
+            Padding="16">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -18,25 +18,28 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <Grid Grid.Row="0" Margin="2,0,2,16">
+            <Grid Grid.Row="0" Margin="0,0,0,12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
+
                 <StackPanel Spacing="2">
-                    <TextBlock Text="原神账号切换器" FontSize="24" FontWeight="SemiBold" />
-                    <TextBlock Text="国服 · 本地账号管理" FontSize="12" Opacity="0.62" />
+                    <TextBlock Text="原神账号切换器"
+                               Style="{StaticResource TitleTextBlockStyle}" />
+                    <TextBlock Text="国服 · 本地账号管理"
+                               Style="{StaticResource CaptionTextBlockStyle}"
+                               Opacity="0.62" />
                 </StackPanel>
 
                 <Button x:Name="MoreButton"
                         Grid.Column="1"
                         Content="⋯"
-                        Width="38"
-                        Height="34"
+                        Width="36"
+                        Height="32"
                         Padding="0"
                         FontSize="18"
-                        VerticalAlignment="Center"
-                        CornerRadius="4">
+                        VerticalAlignment="Center">
                     <Button.Flyout>
                         <MenuFlyout>
                             <MenuFlyoutItem Text="刷新状态" Click="OnRefreshClick" />
@@ -55,55 +58,63 @@
                 </Button>
             </Grid>
 
-            <Border Grid.Row="1"
-                    Background="#2B2B2B"
-                    BorderBrush="#3B3B3B"
-                    BorderThickness="1"
-                    CornerRadius="12"
-                    Padding="16"
-                    Margin="0,0,0,16">
-                <Grid ColumnSpacing="16">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
+            <StackPanel Grid.Row="1" Spacing="8" Margin="0,0,0,12">
+                <TextBlock Text="当前账号"
+                           Style="{StaticResource BodyStrongTextBlockStyle}" />
 
-                    <StackPanel Spacing="5">
-                        <TextBlock Text="当前账号" FontSize="12" Opacity="0.60" />
-                        <TextBlock x:Name="CurrentAccountText" Text="正在读取…" FontSize="20" FontWeight="SemiBold" />
-                        <TextBlock x:Name="CurrentUidText" Text="UID —" FontSize="13" Opacity="0.72" />
-                        <TextBlock x:Name="CredentialStateText"
-                                   Text=""
-                                   FontSize="12"
-                                   Foreground="#F2C94C"
-                                   TextWrapping="Wrap" />
-                    </StackPanel>
+                <Border Background="{ThemeResource ControlFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="{ThemeResource ControlCornerRadius}"
+                        Padding="16,12">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
 
-                    <Button x:Name="AddButton"
-                            Grid.Column="1"
-                            Content="添加当前账号"
-                            VerticalAlignment="Center"
-                            CornerRadius="4"
-                            Click="OnAddClick" />
-                </Grid>
-            </Border>
+                        <StackPanel Spacing="2">
+                            <TextBlock x:Name="CurrentAccountText"
+                                       Text="正在读取…"
+                                       Style="{StaticResource SubtitleTextBlockStyle}" />
+                            <TextBlock x:Name="CurrentUidText"
+                                       Text="UID —"
+                                       Style="{StaticResource CaptionTextBlockStyle}"
+                                       Opacity="0.72" />
+                            <TextBlock x:Name="CredentialStateText"
+                                       Text=""
+                                       Style="{StaticResource CaptionTextBlockStyle}"
+                                       Foreground="{ThemeResource SystemFillColorCautionBrush}"
+                                       TextWrapping="Wrap"
+                                       Visibility="Collapsed" />
+                        </StackPanel>
 
-            <Grid Grid.Row="2" MinHeight="230">
+                        <Button x:Name="AddButton"
+                                Grid.Column="1"
+                                Content="添加当前账号"
+                                VerticalAlignment="Center"
+                                Click="OnAddClick" />
+                    </Grid>
+                </Border>
+            </StackPanel>
+
+            <Grid Grid.Row="2" MinHeight="210">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <Grid Margin="2,0,2,8">
+                <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="已保存账号" FontSize="15" FontWeight="SemiBold" />
+                    <TextBlock Text="已保存账号"
+                               Style="{StaticResource BodyStrongTextBlockStyle}" />
                     <TextBlock Grid.Column="1"
                                x:Name="AccountCountText"
                                Text="0 个"
-                               FontSize="12"
+                               Style="{StaticResource CaptionTextBlockStyle}"
                                Opacity="0.60"
                                VerticalAlignment="Center" />
                 </Grid>
@@ -113,55 +124,36 @@
                           SelectionMode="Single"
                           IsItemClickEnabled="False"
                           HorizontalContentAlignment="Stretch"
-                          MaxHeight="300"
-                          SelectionChanged="OnAccountSelectionChanged">
-                    <ListView.Resources>
-                        <Style TargetType="ListViewItem">
-                            <Setter Property="Padding" Value="0" />
-                            <Setter Property="Margin" Value="0,0,0,6" />
-                            <Setter Property="MinHeight" Value="48" />
-                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="ListViewItem">
-                                        <ContentPresenter Content="{TemplateBinding Content}"
-                                                          ContentTemplate="{TemplateBinding ContentTemplate}"
-                                                          HorizontalContentAlignment="Stretch" />
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                    </ListView.Resources>
-                </ListView>
+                          MaxHeight="260"
+                          SelectionChanged="OnAccountSelectionChanged" />
             </Grid>
 
-            <Grid Grid.Row="3" Margin="0,16,0,10" ColumnSpacing="8">
+            <Grid Grid.Row="3" Margin="0,12,0,0" ColumnSpacing="8">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <Button x:Name="SwitchButton"
                         Content="切换账号"
+                        Style="{StaticResource AccentButtonStyle}"
                         HorizontalAlignment="Stretch"
-                        CornerRadius="4"
                         Click="OnSwitchClick" />
                 <Button x:Name="SwitchLaunchButton"
                         Grid.Column="1"
-                        Content="切换并启动原神"
+                        Content="启动"
                         Style="{StaticResource AccentButtonStyle}"
                         HorizontalAlignment="Stretch"
-                        CornerRadius="4"
                         Click="OnSwitchLaunchClick" />
             </Grid>
 
             <TextBlock Grid.Row="4"
                        x:Name="StatusText"
                        Text=""
-                       MinHeight="18"
-                       FontSize="12"
+                       Margin="0,8,0,0"
+                       Style="{StaticResource CaptionTextBlockStyle}"
                        Opacity="0.68"
-                       VerticalAlignment="Center"
-                       TextTrimming="CharacterEllipsis" />
+                       TextTrimming="CharacterEllipsis"
+                       Visibility="Collapsed" />
         </Grid>
     </Border>
 </Window>
