@@ -1,6 +1,7 @@
 #pragma once
 
 #include <windows.h>
+#include <winrt/base.h>
 #include <string>
 #include <vector>
 #include <optional>
@@ -140,6 +141,7 @@ namespace gas
 
         static std::wstring GuidToString(GUID const& id);
         static GUID GuidFromString(std::wstring const& text);
+        static GUID GuidFromString(winrt::hstring const& text) { return GuidFromString(std::wstring(text.c_str())); }
         static std::wstring UtcNowText();
         static std::wstring ReadTextUtf8(std::filesystem::path const& path);
         static std::vector<unsigned char> ReadAllBytes(std::filesystem::path const& path);
