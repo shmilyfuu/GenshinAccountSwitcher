@@ -115,7 +115,12 @@
   <ItemGroup>
     <None Include="README.txt" />
     <None Include="Assets\AppIcon.ico" />
+    <None Include="Assets\AppIcon.valid.b64" />
   </ItemGroup>
+
+  <Target Name="GenerateAppIcon" BeforeTargets="PrepareForBuild">
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -Command &quot;$b=[Convert]::FromBase64String([IO.File]::ReadAllText('$(ProjectDir)Assets\AppIcon.valid.b64')); [IO.File]::WriteAllBytes('$(ProjectDir)Assets\AppIcon.ico',$b)&quot;" />
+  </Target>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
