@@ -19,13 +19,14 @@ namespace winrt::GenshinAccountSwitcher::implementation
         void OnSwitchLaunchClick(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void OnRestoreClick(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void OnSelectGamePathClick(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void OnOpenDataDirectoryClick(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void OnOpenLogClick(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
 
     private:
         struct AccountVisual
         {
             Microsoft::UI::Xaml::Controls::ListViewItem item{ nullptr };
             Microsoft::UI::Xaml::Controls::Border card{ nullptr };
-            Microsoft::UI::Xaml::Controls::Border accent{ nullptr };
             Microsoft::UI::Xaml::Controls::Border badge{ nullptr };
             Microsoft::UI::Xaml::Controls::TextBlock badgeText{ nullptr };
         };
@@ -37,17 +38,29 @@ namespace winrt::GenshinAccountSwitcher::implementation
         bool m_initialized{ false };
         bool m_firstActivation{ true };
         bool m_rebuildingAccounts{ false };
+        bool m_gameWasRunning{ false };
+        bool m_settlementRunning{ false };
+        int m_runtimePollTicks{ 0 };
+        Microsoft::UI::Dispatching::DispatcherQueueTimer m_monitorTimer{ nullptr };
 
         void ResizeWindow();
-        void RefreshUi(bool rebuildAccounts = true);
+        void RefreshUi(bool rebuildAccounts = true, bool showRefreshStatus = false);
+        gas::CurrentState ClassifyProbe(gas::CurrentProbe const& probe, bool gameRunning);
         void RebuildAccounts();
         AccountVisual BuildAccountVisual(int index);
         void UpdateAccountVisuals();
         void UpdateButtonStates();
         void SetStatus(std::wstring const& text);
+        void StartMonitoring();
+        void OnMonitorTick(Microsoft::UI::Dispatching::DispatcherQueueTimer const&, IInspectable const&);
         HWND WindowHandle() const;
         std::wstring ChooseGameExecutable();
+        void OpenPath(std::filesystem::path const& path);
+        bool BackupCredential(gas::AccountProfile const& account);
+        void RemoveCredentialBackup(gas::AccountProfile const& account) noexcept;
+        static bool IdentitySnapshotEquals(gas::RegistrySnapshot const& a, gas::RegistrySnapshot const& b) noexcept;
 
+        winrt::fire_and_forget SettleAndReconcileAsync(bool initialPass);
         winrt::fire_and_forget AddCurrentAsync();
         winrt::fire_and_forget UpdateSelectedAsync();
         winrt::fire_and_forget RenameSelectedAsync();
