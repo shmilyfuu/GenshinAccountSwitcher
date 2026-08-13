@@ -33,13 +33,19 @@ namespace
         }
     }
 
+    winrt::GenshinAccountSwitcher::implementation::MainWindow* GetMainWindowImpl(
+        winrt::Microsoft::UI::Xaml::Window const& window)
+    {
+        auto projected = window.as<winrt::GenshinAccountSwitcher::MainWindow>();
+        return winrt::get_self<winrt::GenshinAccountSwitcher::implementation::MainWindow>(projected);
+    }
+
     void ReserveSavedAccountSlots(winrt::Microsoft::UI::Xaml::Window const& window)
     {
         using namespace winrt::Microsoft::UI::Xaml;
         using namespace winrt::Microsoft::UI::Xaml::Controls;
 
-        auto projected = window.as<winrt::GenshinAccountSwitcher::MainWindow>();
-        auto self = winrt::get_self<winrt::GenshinAccountSwitcher::implementation::MainWindow>(projected);
+        auto self = GetMainWindowImpl(window);
         auto list = self->AccountsList();
 
         for (auto const& value : list.Items())
@@ -75,6 +81,23 @@ namespace
             }
         }
     }
+
+    void PrewarmInitialXaml(winrt::Microsoft::UI::Xaml::Window const& window)
+    {
+        using namespace winrt::Microsoft::UI::Xaml;
+        using winrt::Windows::Foundation::Rect;
+        using winrt::Windows::Foundation::Size;
+
+        auto self = GetMainWindowImpl(window);
+        self->OnRootLoaded(nullptr, RoutedEventArgs{});
+
+        if (auto root = window.Content().try_as<FrameworkElement>())
+        {
+            root.Measure(Size{ 320.0f, 480.0f });
+            root.Arrange(Rect{ 0.0f, 0.0f, 320.0f, 480.0f });
+            root.UpdateLayout();
+        }
+    }
 }
 
 namespace winrt::GenshinAccountSwitcher::implementation
@@ -90,6 +113,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
         m_window.Title(L"原神账号管理");
         PrepareInitialWindow(m_window);
         ReserveSavedAccountSlots(m_window);
+        PrewarmInitialXaml(m_window);
         m_window.Activate();
     }
 }
