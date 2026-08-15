@@ -15,6 +15,8 @@ using namespace Windows::UI;
 namespace
 {
     constexpr ULONGLONG kTransientStatusMilliseconds = 6000;
+    constexpr double kSavedAccountUidSlotWidth = 92.0;
+    constexpr double kSavedAccountStatusSlotWidth = 64.0;
 
     SolidColorBrush MakeFallbackBrush(uint8_t a, uint8_t r, uint8_t g, uint8_t b)
     {
@@ -37,9 +39,9 @@ namespace
         return value.GridUnitType == GridUnitType::Star && std::abs(value.Value - 1.0) < 0.001;
     }
 
-    bool IsAuto(GridLength const& value) noexcept
+    bool IsFixedPixel(GridLength const& value, double expected) noexcept
     {
-        return value.GridUnitType == GridUnitType::Auto;
+        return value.GridUnitType == GridUnitType::Pixel && std::abs(value.Value - expected) < 0.001;
     }
 }
 
@@ -186,8 +188,8 @@ namespace winrt::GenshinAccountSwitcher::implementation
             bool alreadyNormalized =
                 columns.Size() == 3 &&
                 IsUnitStar(columns.GetAt(0).Width()) &&
-                IsAuto(columns.GetAt(1).Width()) &&
-                IsAuto(columns.GetAt(2).Width());
+                IsFixedPixel(columns.GetAt(1).Width(), kSavedAccountUidSlotWidth) &&
+                IsFixedPixel(columns.GetAt(2).Width(), kSavedAccountStatusSlotWidth);
 
             if (alreadyNormalized) continue;
 
@@ -205,12 +207,14 @@ namespace winrt::GenshinAccountSwitcher::implementation
             nameColumn.Width(GridLength{ 1.0, GridUnitType::Star });
             columns.Append(nameColumn);
 
+            // Keep the UID and status areas at the same width for every row. The status
+            // column therefore keeps its space even while the current-account badge is collapsed.
             ColumnDefinition uidColumn;
-            uidColumn.Width(GridLength{ 1.0, GridUnitType::Auto });
+            uidColumn.Width(GridLength{ kSavedAccountUidSlotWidth, GridUnitType::Pixel });
             columns.Append(uidColumn);
 
             ColumnDefinition badgeColumn;
-            badgeColumn.Width(GridLength{ 1.0, GridUnitType::Auto });
+            badgeColumn.Width(GridLength{ kSavedAccountStatusSlotWidth, GridUnitType::Pixel });
             columns.Append(badgeColumn);
 
             auto children = row.Children();
