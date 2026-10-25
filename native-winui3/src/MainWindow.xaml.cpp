@@ -72,6 +72,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
             m_core.Initialize();
             m_initialized = true;
             m_gameWasRunning = m_core.IsGameRunning();
+            m_lastObservedGameRunning = m_gameWasRunning;
             RefreshUi(true, false);
             StartMonitoring();
         }
@@ -347,18 +348,25 @@ namespace winrt::GenshinAccountSwitcher::implementation
         UpdateButtonStates();
     }
 
+    bool MainWindow::IsInteractionBlocked() const
+    {
+        return m_settlementRunning || m_settlementFailed || m_operationBusy ||
+            m_launchPending || m_core.IsGameRunning();
+    }
+
     void MainWindow::UpdateButtonStates()
     {
         bool selected = m_initialized && m_selectedIndex >= 0 &&
             m_selectedIndex < static_cast<int>(m_core.Accounts().size());
+        bool allowed = m_initialized && !IsInteractionBlocked();
 
-        SwitchButton().IsEnabled(selected);
-        SwitchLaunchButton().IsEnabled(m_initialized);
-        UpdateMenuItem().IsEnabled(selected);
-        RenameMenuItem().IsEnabled(selected);
-        DeleteMenuItem().IsEnabled(selected);
-        RestoreMenuItem().IsEnabled(m_initialized && m_core.RecoveryExists());
-        AddButton().IsEnabled(m_initialized);
+        SwitchButton().IsEnabled(selected && allowed);
+        SwitchLaunchButton().IsEnabled(allowed);
+        UpdateMenuItem().IsEnabled(selected && allowed);
+        RenameMenuItem().IsEnabled(selected && !m_operationBusy && !m_settlementRunning);
+        DeleteMenuItem().IsEnabled(selected && !m_operationBusy && !m_settlementRunning);
+        RestoreMenuItem().IsEnabled(allowed && m_core.RecoveryExists());
+        AddButton().IsEnabled(allowed);
     }
 
     void MainWindow::StartMonitoring()
@@ -382,21 +390,28 @@ namespace winrt::GenshinAccountSwitcher::implementation
 
         if (running)
         {
+            m_lastObservedGameRunning = true;
+            m_launchPending = false;
             if (!m_gameWasRunning)
             {
                 m_gameWasRunning = true;
                 m_runtimePollTicks = 0;
                 RefreshUi(false, false);
             }
-            return;
         }
-
-        if (m_gameWasRunning)
+        else
         {
-            m_gameWasRunning = false;
-            m_runtimePollTicks = 0;
-            SettleAndReconcileAsync(false);
+            if (m_gameWasRunning || m_lastObservedGameRunning)
+            {
+                m_gameWasRunning = false;
+                m_lastObservedGameRunning = false;
+                m_runtimePollTicks = 0;
+                SettleAndReconcileAsync(false);
+            }
+            if (m_launchPending && GetTickCount64() >= m_launchPendingDeadline)
+                m_launchPending = false;
         }
+        UpdateButtonStates();
     }
 
     bool MainWindow::BackupCredential(gas::AccountProfile const& account)
@@ -437,6 +452,8 @@ namespace winrt::GenshinAccountSwitcher::implementation
         auto lifetime = get_strong();
         if (m_settlementRunning) co_return;
         m_settlementRunning = true;
+        m_settlementFailed = false;
+        UpdateButtonStates();
 
         struct ResetFlag
         {
@@ -476,6 +493,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
 
             if (!settled)
             {
+                m_settlementFailed = true;
                 RefreshUi(true, false);
                 SetStatus(L"登录状态仍在变化，本次未自动更新。可稍后使用“更多 → 刷新状态”。");
                 co_return;
@@ -488,6 +506,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
                 auto account = m_core.Accounts()[static_cast<size_t>(finalState.accountIndex)];
                 if (!BackupCredential(account))
                 {
+                    m_settlementFailed = true;
                     RefreshUi(true, false);
                     SetStatus(L"无法创建上一版登录凭据备份，本次未自动更新。");
                     co_return;
@@ -498,7 +517,10 @@ namespace winrt::GenshinAccountSwitcher::implementation
                 if (result.success)
                     SetStatus(L"“" + account.name + L"”的登录信息已自动更新。");
                 else
+                {
+                    m_settlementFailed = true;
                     SetStatus(L"自动更新登录信息失败，已保留上一版凭据。");
+                }
                 co_return;
             }
 
@@ -506,7 +528,10 @@ namespace winrt::GenshinAccountSwitcher::implementation
             if (finalState.matchKind == gas::CurrentMatchKind::AmbiguousUid)
                 SetStatus(L"当前 UID 对应多条已保存记录，本次未自动更新。");
             else if (finalState.matchKind == gas::CurrentMatchKind::Inconsistent)
+            {
+                m_settlementFailed = true;
                 SetStatus(L"UID 与登录凭据不一致，本次未自动处理。");
+            }
             else if (finalState.matchKind == gas::CurrentMatchKind::None && finalState.hasAdl && !finalState.uid.empty())
                 SetStatus(L"检测到未保存账号，可在当前账号区域添加。");
             else if (!initialPass && finalState.matchKind == gas::CurrentMatchKind::ExactCredential)
@@ -518,6 +543,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
         }
         catch (...)
         {
+            m_settlementFailed = true;
             RefreshUi(true, false);
             SetStatus(L"自动同步登录状态时发生异常，本次未修改已保存账号。");
         }
@@ -530,25 +556,34 @@ namespace winrt::GenshinAccountSwitcher::implementation
     void MainWindow::OnSwitchClick(IInspectable const&, RoutedEventArgs const&) { SwitchSelectedAsync(false); }
     void MainWindow::OnSwitchLaunchClick(IInspectable const&, RoutedEventArgs const&)
     {
-        if (!m_initialized) return;
+        LaunchGameFromUi();
+    }
+
+    void MainWindow::LaunchGameFromUi()
+    {
+        if (!m_initialized || IsInteractionBlocked()) return;
+        m_launchPending = true;
+        m_launchPendingDeadline = GetTickCount64() + 20000;
+        UpdateButtonStates();
         try
         {
-            if (m_core.IsGameRunning())
-            {
-                SetStatus(L"原神已经运行。");
-                return;
-            }
-
             auto launch = m_core.LaunchGame();
             if (!launch.success)
+            {
+                m_launchPending = false;
+                if (m_trayHidden) RestoreFromTray();
                 ShowMessage(L"启动失败", launch.message);
+            }
             else
-                SetStatus(L"已启动原神。");
+                SetStatus(L"已发出游戏启动请求，正在等待游戏进程…");
         }
         catch (...)
         {
+            m_launchPending = false;
+            if (m_trayHidden) RestoreFromTray();
             ShowMessage(L"启动失败", L"启动原神时发生异常。");
         }
+        UpdateButtonStates();
     }
     void MainWindow::OnRestoreClick(IInspectable const&, RoutedEventArgs const&) { RestoreAsync(); }
 
@@ -754,11 +789,19 @@ namespace winrt::GenshinAccountSwitcher::implementation
     {
         auto lifetime = get_strong();
         if (m_selectedIndex < 0 || m_selectedIndex >= static_cast<int>(m_core.Accounts().size())) co_return;
-        if (m_core.IsGameRunning())
+        if (IsInteractionBlocked())
         {
-            co_await ShowMessageAsync(L"无法切换", L"原神正在运行。请完全退出原神后再切换账号。");
+            if (m_trayHidden) RestoreFromTray();
+            co_await ShowMessageAsync(L"无法切换", L"游戏运行中、账号状态同步中或已有操作正在进行。");
             co_return;
         }
+        m_operationBusy = true;
+        UpdateButtonStates();
+        struct BusyGuard
+        {
+            MainWindow* window;
+            ~BusyGuard() { window->m_operationBusy = false; window->UpdateButtonStates(); }
+        } busy{ this };
 
         int targetIndex = m_selectedIndex;
         auto account = m_core.Accounts()[static_cast<size_t>(targetIndex)];
@@ -791,6 +834,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
                 catch (...) {}
             }
             RefreshUi(true, false);
+            if (m_trayHidden) RestoreFromTray();
             co_await ShowMessageAsync(L"切换失败", result.message + rollbackText);
             co_return;
         }
