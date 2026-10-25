@@ -57,6 +57,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
             Title(L"原神账号管理");
             ConfigureFixedWindow();
             ApplyWindowIcon();
+            InitializeTray();
 
             if (m_monitorTimer)
             {
@@ -293,7 +294,8 @@ namespace winrt::GenshinAccountSwitcher::implementation
         if (!queue) return;
 
         ReleaseTrackedGameProcess();
-        m_gameWasRunning = false;
+        m_gameWasRunning = m_core.IsGameRunning();
+        m_lastObservedGameRunning = m_gameWasRunning;
 
         m_processDiscoveryTimer = queue.CreateTimer();
         m_processDiscoveryTimer.Interval(std::chrono::milliseconds(2000));
@@ -321,7 +323,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
         DWORD pid = FindCurrentSessionGameProcessId();
         if (pid == 0)
         {
-            m_gameWasRunning = false;
+            m_gameWasRunning = m_core.IsGameRunning();
             return;
         }
         TrackGameProcess(pid);
@@ -337,7 +339,10 @@ namespace winrt::GenshinAccountSwitcher::implementation
         m_trackedGameProcess = process;
         m_trackedGamePid = pid;
         m_gameWasRunning = true;
+        m_lastObservedGameRunning = true;
+        m_launchPending = false;
         RefreshUi(false, false);
+        UpdateButtonStates();
         RefreshUnifiedStatus(true);
     }
 
@@ -355,9 +360,21 @@ namespace winrt::GenshinAccountSwitcher::implementation
     void MainWindow::OnTrackedGameExited()
     {
         ReleaseTrackedGameProcess();
+        // Another YuanShen process may still be running; do not settle early.
+        if (m_core.IsGameRunning())
+        {
+            m_gameWasRunning = true;
+            m_lastObservedGameRunning = true;
+            DiscoverCurrentSessionGame();
+            UpdateButtonStates();
+            RefreshUnifiedStatus(true);
+            return;
+        }
         m_gameWasRunning = false;
+        m_lastObservedGameRunning = false;
         SetStatus(L"游戏已退出，正在同步账号状态…");
         SettleAndReconcileAsync(false);
+        UpdateButtonStates();
     }
 
     void MainWindow::OnStatusTextPropertyChanged(DependencyObject const&, DependencyProperty const&)
@@ -387,6 +404,26 @@ namespace winrt::GenshinAccountSwitcher::implementation
             }
         }
 
+        bool running = m_core.IsGameRunning();
+        if (running)
+        {
+            m_lastObservedGameRunning = true;
+            m_gameWasRunning = true;
+            m_launchPending = false;
+        }
+        else if (m_lastObservedGameRunning)
+        {
+            m_lastObservedGameRunning = false;
+            m_gameWasRunning = false;
+            SetStatus(L"游戏已退出，正在同步账号状态…");
+            SettleAndReconcileAsync(false);
+        }
+        if (!running && m_launchPending && GetTickCount64() >= m_launchPendingDeadline)
+        {
+            m_launchPending = false;
+            SetStatus(L"未检测到游戏进程，请确认游戏是否成功启动。");
+        }
+        UpdateButtonStates();
         RefreshUnifiedStatus(false);
     }
 
@@ -410,6 +447,10 @@ namespace winrt::GenshinAccountSwitcher::implementation
 
     std::wstring MainWindow::BuildBaseStatusText() const
     {
+        if (m_core.IsGameRunning()) return L"游戏正在运行，请完全退出后再切换账号。";
+        if (m_launchPending) return L"正在启动游戏，等待检测到游戏进程…";
+        if (m_settlementRunning) return L"游戏已退出，正在同步账号状态…";
+        if (m_settlementFailed) return L"登录态同步未完成，请使用“更多 → 刷新状态”重试。";
         switch (m_currentState.matchKind)
         {
         case gas::CurrentMatchKind::UniqueUidCredentialChanged:
