@@ -65,12 +65,37 @@ namespace winrt::GenshinAccountSwitcher::implementation
         InitializeComponent();
     }
 
-    void App::OnLaunched(Microsoft::UI::Xaml::LaunchActivatedEventArgs const&)
+    winrt::fire_and_forget App::OnLaunched(Microsoft::UI::Xaml::LaunchActivatedEventArgs const&)
     {
+        using Microsoft::Windows::AppLifecycle::AppInstance;
+        auto mainInstance = AppInstance::FindOrRegisterForKey(L"shmilyfuu.GenshinAccountSwitcher");
+        if (!mainInstance.IsCurrent())
+        {
+            // The secondary process never opens account files or creates a window.
+            auto activation = AppInstance::GetCurrent().GetActivatedEventArgs();
+            co_await mainInstance.RedirectActivationToAsync(activation);
+            ::ExitProcess(0);
+            co_return;
+        }
+
+        m_dispatcher = Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread();
+        m_redirectedToken = mainInstance.Activated({ this, &App::OnRedirectedActivation });
         m_window = winrt::make<MainWindow>();
         m_window.Title(L"原神账号管理");
         PrepareInitialWindow(m_window);
         PrewarmInitialXaml(m_window);
         m_window.Activate();
+    }
+
+    void App::OnRedirectedActivation(
+        IInspectable const&, Microsoft::Windows::AppLifecycle::AppActivationArguments const&)
+    {
+        auto queue = m_dispatcher;
+        if (!queue) return;
+        queue.TryEnqueue([this]()
+        {
+            if (m_window)
+                GetMainWindowImpl(m_window)->RestoreFromTray();
+        });
     }
 }
