@@ -7,6 +7,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
     struct MainWindow : MainWindowT<MainWindow>
     {
         MainWindow();
+        void RestoreFromTray();
 
         void OnWindowActivated(IInspectable const&, Microsoft::UI::Xaml::WindowActivatedEventArgs const&);
         void OnRootLoaded(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
@@ -41,6 +42,11 @@ namespace winrt::GenshinAccountSwitcher::implementation
         bool m_rebuildingAccounts{ false };
         bool m_gameWasRunning{ false };
         bool m_settlementRunning{ false };
+        bool m_settlementFailed{ false };
+        bool m_lastObservedGameRunning{ false };
+        bool m_launchPending{ false };
+        ULONGLONG m_launchPendingDeadline{ 0 };
+        bool m_operationBusy{ false };
         int m_runtimePollTicks{ 0 };
         Microsoft::UI::Dispatching::DispatcherQueueTimer m_monitorTimer{ nullptr };
 
@@ -53,6 +59,10 @@ namespace winrt::GenshinAccountSwitcher::implementation
         DWORD m_trackedGamePid{ 0 };
         Microsoft::UI::Dispatching::DispatcherQueueTimer m_processDiscoveryTimer{ nullptr };
         Microsoft::UI::Dispatching::DispatcherQueueTimer m_statusTimer{ nullptr };
+        HWND m_trayWindow{ nullptr };
+        UINT m_taskbarCreatedMessage{ 0 };
+        bool m_trayIconAdded{ false };
+        bool m_trayHidden{ false };
 
         void ResizeWindow();
         void RefreshUi(bool rebuildAccounts = true, bool showRefreshStatus = false);
@@ -61,6 +71,8 @@ namespace winrt::GenshinAccountSwitcher::implementation
         AccountVisual BuildAccountVisual(int index);
         void UpdateAccountVisuals();
         void UpdateButtonStates();
+        bool IsInteractionBlocked() const;
+        void LaunchGameFromUi();
         void SetStatus(std::wstring const& text);
         void StartMonitoring();
         void OnMonitorTick(Microsoft::UI::Dispatching::DispatcherQueueTimer const&, IInspectable const&);
@@ -86,6 +98,12 @@ namespace winrt::GenshinAccountSwitcher::implementation
         void RefreshUnifiedStatus(bool force = false);
         std::wstring BuildBaseStatusText() const;
         void SetUnifiedStatusText(std::wstring const& text);
+        bool InitializeTray();
+        void AddTrayIcon();
+        void RemoveTrayIcon();
+        void HideToTray();
+        void ShowTrayMenu();
+        void OnTrayCommand(UINT command);
         static DWORD FindCurrentSessionGameProcessId();
         static VOID CALLBACK GameExitWaitCallback(PVOID context, BOOLEAN timedOut);
         static LRESULT CALLBACK WindowSubclassProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam, UINT_PTR subclassId, DWORD_PTR referenceData);
