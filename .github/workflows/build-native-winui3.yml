@@ -3,7 +3,7 @@ name: Build Native WinUI3
 on:
   workflow_dispatch:
   push:
-    branches: [ native-winui3 ]
+    branches: [ native-winui3, feature/v1.1.0 ]
     paths:
       - 'native-winui3/src/**'
       - '.github/workflows/build-native-winui3.yml'
