@@ -431,8 +431,6 @@ namespace winrt::GenshinAccountSwitcher::implementation
             if (LOWORD(wParam) == WA_INACTIVE)
                 self->HideTrayMenu();
         }
-        if (message == WM_SHOWWINDOW)
-
         if ((message == WM_KEYDOWN || message == WM_SYSKEYDOWN) && wParam == VK_ESCAPE)
         {
             self->HideTrayMenu();
