@@ -9,9 +9,11 @@
 #include <winrt/Microsoft.UI.Xaml.Input.h>
 #include <algorithm>
 #include <cmath>
+#include <dwmapi.h>
 
 #pragma comment(lib, "Shell32.lib")
 #pragma comment(lib, "Comctl32.lib")
+#pragma comment(lib, "Dwmapi.lib")
 
 namespace
 {
@@ -101,23 +103,83 @@ namespace winrt::GenshinAccountSwitcher::implementation
     {
         if (!m_trayWindow || !m_trayIconAdded) return;
         HideTrayMenu();
+
+        // Cancel a pending frame-synchronized reveal while the HWND is hidden.
+        if (m_mainRevealPending)
+        {
+            ShowWindow(m_trayWindow, SW_HIDE);
+            m_mainRevealPending = false;
+            Microsoft::UI::Xaml::Media::CompositionTarget::Rendering(m_mainRenderingToken);
+            if (m_mainRevealFallback) m_mainRevealFallback.Stop();
+            BOOL uncloak = FALSE;
+            DwmSetWindowAttribute(m_trayWindow, DWMWA_CLOAK,
+                &uncloak, sizeof(uncloak));
+        }
         m_trayHidden = true;
-        // Hide before Windows minimizes the WinUI window so its XAML
-        // content remains laid out for the next activation.
         ShowWindow(m_trayWindow, SW_HIDE);
+    }
+
+    void MainWindow::FinishMainRestore()
+    {
+        if (!m_mainRevealPending) return;
+        m_mainRevealPending = false;
+        Microsoft::UI::Xaml::Media::CompositionTarget::Rendering(m_mainRenderingToken);
+        if (m_mainRevealFallback) m_mainRevealFallback.Stop();
+
+        auto hwnd = WindowHandle();
+        if (!hwnd || m_appExiting) return;
+        BOOL uncloak = FALSE;
+        DwmSetWindowAttribute(hwnd, DWMWA_CLOAK, &uncloak, sizeof(uncloak));
+        SetForegroundWindow(hwnd);
     }
 
     void MainWindow::RestoreFromTray()
     {
         HideTrayMenu();
         auto hwnd = WindowHandle();
-        if (!hwnd || m_appExiting) return;
-        m_trayHidden = false;
+        if (!hwnd || m_appExiting || m_mainRevealPending) return;
 
-        // The normal tray path hides a still-restored window.
-        // Other Windows minimize actions can arrive through WM_SIZE.
+        const bool needsReveal = m_trayHidden || !IsWindowVisible(hwnd) || IsIconic(hwnd);
+        m_trayHidden = false;
+        if (!needsReveal)
+        {
+            SetForegroundWindow(hwnd);
+            return;
+        }
+
+        // Preserve the HWND while WinUI composes its first restored frame.
+        // DWM hides the window until XAML has produced rendered frames.
+        BOOL cloak = TRUE;
+        if (FAILED(DwmSetWindowAttribute(hwnd, DWMWA_CLOAK, &cloak, sizeof(cloak))))
+        {
+            ShowWindow(hwnd, IsIconic(hwnd) ? SW_RESTORE : SW_SHOW);
+            SetForegroundWindow(hwnd);
+            return;
+        }
+
+        m_mainRevealPending = true;
+        m_mainRevealFrames = 0;
+        m_mainRenderingToken = Microsoft::UI::Xaml::Media::CompositionTarget::Rendering(
+            [this](IInspectable const&, IInspectable const&)
+            {
+                if (!m_mainRevealPending) return;
+                if (++m_mainRevealFrames >= 2) FinishMainRestore();
+            });
+
+        if (!m_mainRevealFallback)
+        {
+            m_mainRevealFallback = DispatcherQueue().CreateTimer();
+            m_mainRevealFallback.IsRepeating(false);
+            m_mainRevealFallback.Interval(std::chrono::milliseconds(700));
+            m_mainRevealFallback.Tick([this](
+                Microsoft::UI::Dispatching::DispatcherQueueTimer const&,
+                IInspectable const&)
+            {
+                FinishMainRestore();
+            });
+        }
+        m_mainRevealFallback.Start();
         ShowWindow(hwnd, IsIconic(hwnd) ? SW_RESTORE : SW_SHOW);
-        SetForegroundWindow(hwnd);
         UpdateButtonStates();
     }
 
@@ -139,13 +201,13 @@ namespace winrt::GenshinAccountSwitcher::implementation
         using namespace Microsoft::UI::Xaml;
         using namespace Microsoft::UI::Xaml::Controls;
         using namespace Microsoft::UI::Xaml::Input;
+        using namespace Microsoft::UI::Xaml::Media;
 
         if (!m_trayMenuWindow)
         {
             m_trayMenuWindow = Window();
             m_trayMenuWindow.Title(L"原神账号管理");
 
-            // A regular activatable window is needed for focus and Escape handling.
             auto appWindow = m_trayMenuWindow.AppWindow();
             auto presenter = Microsoft::UI::Windowing::OverlappedPresenter::Create();
             presenter.SetBorderAndTitleBar(true, false);
@@ -182,24 +244,19 @@ namespace winrt::GenshinAccountSwitcher::implementation
                     HideTrayMenu();
                     return;
                 }
-
                 if ((GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0)
                 {
                     HideTrayMenu();
                     return;
                 }
-
-                // Taskbar or desktop interactions may not change foreground focus.
                 if ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) ||
                     (GetAsyncKeyState(VK_RBUTTON) & 0x8000))
                 {
                     POINT pointer{};
-                    RECT popupBounds{};
-                    if (GetCursorPos(&pointer) && GetWindowRect(hwnd, &popupBounds) &&
-                        !PtInRect(&popupBounds, pointer))
-                    {
+                    RECT bounds{};
+                    if (GetCursorPos(&pointer) && GetWindowRect(hwnd, &bounds) &&
+                        !PtInRect(&bounds, pointer))
                         HideTrayMenu();
-                    }
                 }
             });
         }
@@ -208,65 +265,92 @@ namespace winrt::GenshinAccountSwitcher::implementation
         m_trayMenuAccountItems.clear();
         m_trayMenuCheckedIndex = -2;
 
-        MenuFlyoutPresenter menu;
-        menu.Width(kMenuWidth);
-        menu.RequestedTheme(ElementTheme::Dark);
+        auto menuItem = [](std::wstring const& text)
+        {
+            MenuFlyoutItem item;
+            item.Text(winrt::hstring(text));
+            item.HorizontalAlignment(HorizontalAlignment::Stretch);
+            return item;
+        };
 
-        MenuFlyoutItem open;
-        open.Text(L"打开面板");
+        StackPanel layout;
+        layout.Spacing(0);
+        layout.HorizontalAlignment(HorizontalAlignment::Stretch);
+
+        auto open = menuItem(L"打开面板");
         open.Click([this](IInspectable const&, RoutedEventArgs const&)
         {
             OnTrayCommand(kOpenPanelId);
         });
-        menu.Items().Append(open);
+        layout.Children().Append(open);
 
-        m_trayMenuLaunchItem = MenuFlyoutItem();
-        m_trayMenuLaunchItem.Text(L"启动游戏");
+        m_trayMenuLaunchItem = menuItem(L"启动游戏");
         m_trayMenuLaunchItem.Click([this](IInspectable const&, RoutedEventArgs const&)
         {
             OnTrayCommand(kLaunchGameId);
         });
-        menu.Items().Append(m_trayMenuLaunchItem);
-        menu.Items().Append(MenuFlyoutSeparator());
+        layout.Children().Append(m_trayMenuLaunchItem);
+        layout.Children().Append(MenuFlyoutSeparator());
 
-        const auto& accounts = m_core.Accounts();
-        const size_t count = (std::min)(accounts.size(), kMaxTrayAccounts);
+        StackPanel accountRows;
+        accountRows.Spacing(0);
+        auto const& accounts = m_core.Accounts();
+        auto count = (std::min)(accounts.size(), kMaxTrayAccounts);
         if (!m_initialized || count == 0)
         {
-            MenuFlyoutItem empty;
-            empty.Text(L"暂无已保存账号");
+            auto empty = menuItem(L"暂无已保存账号");
             empty.IsEnabled(false);
-            menu.Items().Append(empty);
+            accountRows.Children().Append(empty);
         }
         else
         {
             for (size_t i = 0; i < count; ++i)
             {
-                MenuFlyoutItem item;
-                item.Text(winrt::hstring(accounts[i].name + L"  UID " + accounts[i].uid));
+                auto item = menuItem(accounts[i].name + L"  UID " + accounts[i].uid);
                 item.Click([this, index = static_cast<int>(i)](
                     IInspectable const&, RoutedEventArgs const&)
                 {
                     OnTrayCommand(kAccountBaseId + static_cast<UINT>(index));
                 });
-                menu.Items().Append(item);
+                accountRows.Children().Append(item);
                 m_trayMenuAccountItems.push_back(item);
             }
         }
 
-        menu.Items().Append(MenuFlyoutSeparator());
-        MenuFlyoutItem exit;
-        exit.Text(L"退出");
+        m_trayAccountsScroll = ScrollViewer();
+        m_trayAccountsScroll.VerticalScrollBarVisibility(ScrollBarVisibility::Auto);
+        m_trayAccountsScroll.HorizontalScrollBarVisibility(ScrollBarVisibility::Disabled);
+        m_trayAccountsScroll.MaxHeight(320);
+        m_trayAccountsScroll.Content(accountRows);
+        layout.Children().Append(m_trayAccountsScroll);
+
+        layout.Children().Append(MenuFlyoutSeparator());
+        auto exit = menuItem(L"退出");
         exit.Click([this](IInspectable const&, RoutedEventArgs const&)
         {
             OnTrayCommand(kExitAppId);
         });
-        menu.Items().Append(exit);
+        layout.Children().Append(exit);
 
-        // MenuFlyoutPresenter owns its native menu ScrollViewer.
-        // Wrapping it in another ScrollViewer causes extra viewport height.
-        m_trayMenuPresenter = menu;
-        m_trayMenuWindow.Content(menu);
+        Border surface;
+        surface.Width(kMenuWidth);
+        surface.RequestedTheme(ElementTheme::Dark);
+        auto resources = Application::Current().Resources();
+        auto background = resources.TryLookup(winrt::box_value(L"MenuFlyoutPresenterBackground"))
+            .try_as<Brush>();
+        auto borderBrush = resources.TryLookup(winrt::box_value(L"MenuFlyoutPresenterBorderBrush"))
+            .try_as<Brush>();
+        surface.Background(background ? background :
+            SolidColorBrush(winrt::Windows::UI::Color{ 255, 32, 32, 32 }));
+        surface.BorderBrush(borderBrush ? borderBrush :
+            SolidColorBrush(winrt::Windows::UI::Color{ 255, 78, 78, 78 }));
+        surface.BorderThickness(Thickness{ 1 });
+        surface.CornerRadius(CornerRadius{ 8 });
+        surface.Padding(Thickness{ 4 });
+        surface.Child(layout);
+
+        m_trayMenuRoot = surface;
+        m_trayMenuWindow.Content(surface);
         RefreshTrayMenuState();
     }
 
@@ -342,10 +426,13 @@ namespace winrt::GenshinAccountSwitcher::implementation
             const double scale = static_cast<double>(dpi ? dpi : 96) / 96.0;
             const double availableHeight = static_cast<double>(
                 workArea.bottom - workArea.top - 16) / scale;
-            m_trayMenuPresenter.MaxHeight(availableHeight);
-            m_trayMenuPresenter.Measure(winrt::Windows::Foundation::Size{
+            // Only the account list scrolls. The header and exit rows retain
+            // their natural height even on a short display.
+            if (m_trayAccountsScroll)
+                m_trayAccountsScroll.MaxHeight((std::max)(36.0, availableHeight - 160.0));
+            m_trayMenuRoot.Measure(winrt::Windows::Foundation::Size{
                 static_cast<float>(kMenuWidth), static_cast<float>(availableHeight) });
-            const double desiredHeight = m_trayMenuPresenter.DesiredSize().Height;
+            const double desiredHeight = m_trayMenuRoot.DesiredSize().Height;
             const int clientWidth = static_cast<int>(std::ceil(kMenuWidth * scale));
             const int clientHeight = static_cast<int>(std::ceil(
                 (std::max)(1.0, (std::min)(availableHeight, desiredHeight)) * scale));
@@ -489,13 +576,20 @@ namespace winrt::GenshinAccountSwitcher::implementation
         if (message == WM_CLOSE && !self->m_appExiting)
         {
             self->m_appExiting = true;
+            if (self->m_mainRevealPending)
+            {
+                self->m_mainRevealPending = false;
+                Microsoft::UI::Xaml::Media::CompositionTarget::Rendering(self->m_mainRenderingToken);
+                if (self->m_mainRevealFallback) self->m_mainRevealFallback.Stop();
+            }
             self->HideTrayMenu();
             if (self->m_trayMenuWindow)
             {
                 auto popup = self->m_trayMenuWindow;
                 self->m_trayMenuWindow = nullptr;
                 self->m_trayMenuLaunchItem = nullptr;
-                self->m_trayMenuPresenter = nullptr;
+                self->m_trayMenuRoot = nullptr;
+                self->m_trayAccountsScroll = nullptr;
                 self->m_trayMenuAccountItems.clear();
                 popup.Close();
             }
