@@ -69,9 +69,14 @@ namespace winrt::GenshinAccountSwitcher::implementation
         bool m_appExiting{ false };
         Microsoft::UI::Xaml::Window m_trayMenuWindow{ nullptr };
         Microsoft::UI::Xaml::Controls::MenuFlyoutItem m_trayMenuLaunchItem{ nullptr };
-        Microsoft::UI::Xaml::Controls::MenuFlyoutPresenter m_trayMenuPresenter{ nullptr };
+        Microsoft::UI::Xaml::Controls::Border m_trayMenuRoot{ nullptr };
+        Microsoft::UI::Xaml::Controls::ScrollViewer m_trayAccountsScroll{ nullptr };
         std::vector<Microsoft::UI::Xaml::Controls::MenuFlyoutItem> m_trayMenuAccountItems;
         Microsoft::UI::Dispatching::DispatcherQueueTimer m_trayMenuDismissTimer{ nullptr };
+        bool m_mainRevealPending{ false };
+        int m_mainRevealFrames{ 0 };
+        winrt::event_token m_mainRenderingToken{};
+        Microsoft::UI::Dispatching::DispatcherQueueTimer m_mainRevealFallback{ nullptr };
 
         void ResizeWindow();
         void RefreshUi(bool rebuildAccounts = true, bool showRefreshStatus = false);
@@ -111,6 +116,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
         void AddTrayIcon();
         void RemoveTrayIcon();
         void HideToTray();
+        void FinishMainRestore();
         void ShowTrayMenu();
         void HideTrayMenu();
         void BuildTrayMenu();
