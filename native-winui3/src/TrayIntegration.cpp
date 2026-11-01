@@ -5,6 +5,7 @@
 #include <shellapi.h>
 #include <commctrl.h>
 #include <microsoft.ui.xaml.window.h>
+#include <winrt/Windows.System.h>
 #include <algorithm>
 
 #pragma comment(lib, "Shell32.lib")
@@ -206,6 +207,15 @@ namespace winrt::GenshinAccountSwitcher::implementation
         surface.BorderThickness(Thickness{ 1 });
         surface.CornerRadius(CornerRadius{ 10 });
         surface.Padding(Thickness{ 6 });
+        surface.KeyDown([this](IInspectable const&,
+            Microsoft::UI::Xaml::Input::KeyRoutedEventArgs const& args)
+        {
+            if (args.Key() == Windows::System::VirtualKey::Escape)
+            {
+                HideTrayMenu();
+                args.Handled(true);
+            }
+        });
 
         StackPanel layout;
         layout.Spacing(0);
@@ -342,7 +352,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
         const UINT dpi = GetDpiForWindow(hwnd);
         const int width = MulDiv(static_cast<int>(kMenuWidth), dpi, 96);
         auto count = (std::min)(m_core.Accounts().size(), kMaxTrayAccounts);
-        const double logicalHeight = 2 * kRowHeight + 3 * kRowHeight +
+        const double logicalHeight = 3 * kRowHeight +
             2 * 9.0 + 14.0 + (std::min)(count ? count : 1, static_cast<size_t>(kVisibleAccountRows)) * kRowHeight;
         const int height = MulDiv(static_cast<int>(logicalHeight), dpi, 96);
 
