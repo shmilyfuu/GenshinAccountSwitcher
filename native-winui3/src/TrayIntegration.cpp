@@ -366,9 +366,9 @@ namespace winrt::GenshinAccountSwitcher::implementation
             SolidColorBrush(winrt::Windows::UI::Color{ 255, 32, 32, 32 }));
         surface.BorderBrush(stroke ? stroke :
             SolidColorBrush(winrt::Windows::UI::Color{ 255, 78, 78, 78 }));
-        surface.BorderThickness(Thickness{ 1.0 });
-        surface.CornerRadius(CornerRadius{ 8.0 });
-        surface.Padding(Thickness{ 4.0 });
+        surface.BorderThickness(Thickness{ 1.0, 1.0, 1.0, 1.0 });
+        surface.CornerRadius(CornerRadius{ 8.0, 8.0, 8.0, 8.0 });
+        surface.Padding(Thickness{ 4.0, 4.0, 4.0, 4.0 });
         surface.Child(items);
 
         m_trayMenuRoot = surface;
