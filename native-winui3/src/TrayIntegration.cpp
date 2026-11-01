@@ -120,7 +120,6 @@ namespace winrt::GenshinAccountSwitcher::implementation
 
     void MainWindow::HideTrayMenu()
     {
-        if (!m_trayMenuVisible) return;
         m_trayMenuVisible = false;
         if (m_trayMenuDismissTimer)
             m_trayMenuDismissTimer.Stop();
