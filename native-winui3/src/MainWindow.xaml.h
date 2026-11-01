@@ -71,12 +71,6 @@ namespace winrt::GenshinAccountSwitcher::implementation
         bool m_appExiting{ false };
         Microsoft::UI::Xaml::Window m_trayMenuWindow{ nullptr };
         Microsoft::UI::Xaml::Controls::MenuFlyoutItem m_trayMenuLaunchItem{ nullptr };
-        Microsoft::UI::Xaml::Controls::Border m_trayMenuRoot{ nullptr };
-        Microsoft::UI::Xaml::Controls::MenuFlyoutItem m_trayMenuExitItem{ nullptr };
-        winrt::event_token m_trayMenuLayoutToken{};
-        bool m_trayMenuSizing{ false };
-        double m_trayMenuAvailableHeight{ 0.0 };
-        POINT m_trayMenuAnchor{};
         std::vector<Microsoft::UI::Xaml::Controls::MenuFlyoutItem> m_trayMenuAccountItems;
         Microsoft::UI::Dispatching::DispatcherQueueTimer m_trayMenuDismissTimer{ nullptr };
         bool m_mainRevealPending{ false };
@@ -105,7 +99,6 @@ namespace winrt::GenshinAccountSwitcher::implementation
 
         void ConfigureFixedWindow();
         void ApplyWindowIcon();
-        void NormalizeAccountRows();
         void StartEnhancedMonitoring();
         void DiscoverCurrentSessionGame();
         void TrackGameProcess(DWORD pid);
@@ -113,7 +106,6 @@ namespace winrt::GenshinAccountSwitcher::implementation
         void OnTrackedGameExited();
         void OnProcessDiscoveryTick(Microsoft::UI::Dispatching::DispatcherQueueTimer const&, IInspectable const&);
         void OnStatusTimerTick(Microsoft::UI::Dispatching::DispatcherQueueTimer const&, IInspectable const&);
-        void OnAccountsLayoutUpdated(IInspectable const&, IInspectable const&);
         void OnStatusTextPropertyChanged(Microsoft::UI::Xaml::DependencyObject const&, Microsoft::UI::Xaml::DependencyProperty const&);
         void RefreshUnifiedStatus(bool force = false);
         std::wstring BuildBaseStatusText() const;
@@ -127,7 +119,6 @@ namespace winrt::GenshinAccountSwitcher::implementation
         void HideTrayMenu();
         void BuildTrayMenu();
         void RefreshTrayMenuState();
-        void AdjustTrayMenuToRenderedContent();
         void OnTrayCommand(UINT command);
         static DWORD FindCurrentSessionGameProcessId();
         static VOID CALLBACK GameExitWaitCallback(PVOID context, BOOLEAN timedOut);
