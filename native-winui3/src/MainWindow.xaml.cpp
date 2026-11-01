@@ -367,6 +367,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
         DeleteMenuItem().IsEnabled(selected && !m_operationBusy && !m_settlementRunning);
         RestoreMenuItem().IsEnabled(allowed && m_core.RecoveryExists());
         AddButton().IsEnabled(allowed);
+        if (m_trayMenuVisible) RefreshTrayMenuState();
     }
 
     void MainWindow::StartMonitoring()
