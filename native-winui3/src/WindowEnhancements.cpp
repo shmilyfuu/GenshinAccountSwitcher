@@ -15,34 +15,7 @@ using namespace Windows::UI;
 namespace
 {
     constexpr ULONGLONG kTransientStatusMilliseconds = 6000;
-    constexpr double kSavedAccountUidSlotWidth = 92.0;
-    constexpr double kSavedAccountStatusSlotWidth = 64.0;
 
-    SolidColorBrush MakeFallbackBrush(uint8_t a, uint8_t r, uint8_t g, uint8_t b)
-    {
-        return SolidColorBrush(Color{ a, r, g, b });
-    }
-
-    Brush LookupBrush(wchar_t const* key, Brush const& fallback)
-    {
-        try
-        {
-            auto value = Application::Current().Resources().TryLookup(box_value(key));
-            if (auto brush = value.try_as<Brush>()) return brush;
-        }
-        catch (...) {}
-        return fallback;
-    }
-
-    bool IsUnitStar(GridLength const& value) noexcept
-    {
-        return value.GridUnitType == GridUnitType::Star && std::abs(value.Value - 1.0) < 0.001;
-    }
-
-    bool IsFixedPixel(GridLength const& value, double expected) noexcept
-    {
-        return value.GridUnitType == GridUnitType::Pixel && std::abs(value.Value - expected) < 0.001;
-    }
 }
 
 namespace winrt::GenshinAccountSwitcher::implementation
@@ -64,13 +37,10 @@ namespace winrt::GenshinAccountSwitcher::implementation
                 m_monitorTimer.Stop();
             }
 
-            AccountsList().LayoutUpdated({ this, &MainWindow::OnAccountsLayoutUpdated });
-
             m_statusTextCallbackToken = StatusText().RegisterPropertyChangedCallback(
                 TextBlock::TextProperty(),
                 { this, &MainWindow::OnStatusTextPropertyChanged });
 
-            NormalizeAccountRows();
             StartEnhancedMonitoring();
             RefreshUnifiedStatus(true);
         }
@@ -163,100 +133,6 @@ namespace winrt::GenshinAccountSwitcher::implementation
         // the classic window icon and WinUI AppWindow icon consistent across shell surfaces.
         if (smallIcon) SendMessageW(hwnd, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(smallIcon));
         if (bigIcon) SendMessageW(hwnd, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(bigIcon));
-    }
-
-    void MainWindow::OnAccountsLayoutUpdated(IInspectable const&, IInspectable const&)
-    {
-        NormalizeAccountRows();
-    }
-
-    void MainWindow::NormalizeAccountRows()
-    {
-        auto badgeBackground = LookupBrush(
-            L"SubtleFillColorSecondaryBrush",
-            MakeFallbackBrush(0xFF, 0x32, 0x32, 0x32));
-        auto badgeForeground = LookupBrush(
-            L"AccentTextFillColorPrimaryBrush",
-            MakeFallbackBrush(0xFF, 0x60, 0xCD, 0xFF));
-
-        for (auto& visual : m_visuals)
-        {
-            if (!visual.card) continue;
-            auto row = visual.card.Child().try_as<Grid>();
-            if (!row) continue;
-
-            auto columns = row.ColumnDefinitions();
-            bool alreadyNormalized =
-                columns.Size() == 3 &&
-                IsUnitStar(columns.GetAt(0).Width()) &&
-                IsFixedPixel(columns.GetAt(1).Width(), kSavedAccountUidSlotWidth) &&
-                IsFixedPixel(columns.GetAt(2).Width(), kSavedAccountStatusSlotWidth);
-
-            if (alreadyNormalized) continue;
-
-            // C++/WinRT CornerRadius is a four-field struct. A single aggregate value only
-            // initializes TopLeft, which was the reason the badge previously had one rounded
-            // corner. Always specify all four corners explicitly for code-created elements.
-            visual.item.Padding(Thickness{ 0, 0, 0, 0 });
-            visual.card.Padding(Thickness{ 16, 0, 16, 0 });
-            visual.card.CornerRadius(CornerRadius{ 4, 4, 4, 4 });
-
-            row.ColumnSpacing(16);
-            columns.Clear();
-
-            ColumnDefinition nameColumn;
-            nameColumn.Width(GridLength{ 1.0, GridUnitType::Star });
-            columns.Append(nameColumn);
-
-            // Keep the UID and status areas at the same width for every row. The status
-            // column therefore keeps its space even while the current-account badge is collapsed.
-            ColumnDefinition uidColumn;
-            uidColumn.Width(GridLength{ kSavedAccountUidSlotWidth, GridUnitType::Pixel });
-            columns.Append(uidColumn);
-
-            ColumnDefinition badgeColumn;
-            badgeColumn.Width(GridLength{ kSavedAccountStatusSlotWidth, GridUnitType::Pixel });
-            columns.Append(badgeColumn);
-
-            auto children = row.Children();
-            if (children.Size() >= 1)
-            {
-                if (auto name = children.GetAt(0).try_as<TextBlock>())
-                {
-                    Grid::SetColumn(name, 0);
-                    name.HorizontalAlignment(HorizontalAlignment::Left);
-                    name.VerticalAlignment(VerticalAlignment::Center);
-                    name.TextTrimming(TextTrimming::CharacterEllipsis);
-                }
-            }
-            if (children.Size() >= 2)
-            {
-                if (auto uid = children.GetAt(1).try_as<TextBlock>())
-                {
-                    Grid::SetColumn(uid, 1);
-                    uid.HorizontalAlignment(HorizontalAlignment::Right);
-                    uid.VerticalAlignment(VerticalAlignment::Center);
-                    uid.TextAlignment(TextAlignment::Right);
-                    uid.TextTrimming(TextTrimming::None);
-                }
-            }
-
-            if (visual.badge)
-            {
-                Grid::SetColumn(visual.badge, 2);
-                visual.badge.HorizontalAlignment(HorizontalAlignment::Right);
-                visual.badge.VerticalAlignment(VerticalAlignment::Center);
-                visual.badge.CornerRadius(CornerRadius{ 4, 4, 4, 4 });
-                visual.badge.Padding(Thickness{ 6, 2, 6, 2 });
-                visual.badge.Margin(Thickness{ 0, 0, 0, 0 });
-                visual.badge.Background(badgeBackground);
-            }
-            if (visual.badgeText)
-            {
-                visual.badgeText.Foreground(badgeForeground);
-                visual.badgeText.Opacity(1.0);
-            }
-        }
     }
 
     DWORD MainWindow::FindCurrentSessionGameProcessId()
