@@ -27,6 +27,10 @@ namespace
     constexpr UINT kAccountBaseId = 0x6200;
     constexpr size_t kMaxTrayAccounts = 2048;
     constexpr double kMenuWidth = 304.0;
+    constexpr double kMenuRowHeight = 36.0;
+    constexpr double kMenuSeparatorHeight = 11.0;
+    constexpr double kMenuOuterVerticalInset = 10.0;
+    constexpr size_t kVisibleAccountRows = 8;
 
     using namespace winrt::Microsoft::UI::Xaml;
     using namespace winrt::Microsoft::UI::Xaml::Controls;
@@ -237,7 +241,6 @@ namespace winrt::GenshinAccountSwitcher::implementation
                 Microsoft::UI::Dispatching::DispatcherQueueTimer const&, IInspectable const&)
             {
                 if (!m_trayMenuVisible || m_appExiting) return;
-                AdjustTrayMenuToRenderedContent();
                 auto hwnd = GetWindowHandle(m_trayMenuWindow);
                 if (!hwnd || !IsWindowVisible(hwnd) || !OwnsForeground(hwnd))
                 {
@@ -263,9 +266,6 @@ namespace winrt::GenshinAccountSwitcher::implementation
             });
         }
 
-        if (m_trayMenuRoot)
-            m_trayMenuRoot.LayoutUpdated(m_trayMenuLayoutToken);
-        m_trayMenuExitItem = nullptr;
         m_trayMenuLaunchItem = nullptr;
         m_trayMenuAccountItems.clear();
         m_trayMenuCheckedIndex = -2;
@@ -275,7 +275,9 @@ namespace winrt::GenshinAccountSwitcher::implementation
             MenuFlyoutItem item;
             item.Text(winrt::hstring(text));
             item.HorizontalAlignment(HorizontalAlignment::Stretch);
-            item.MinHeight(36.0);
+            item.MinHeight(kMenuRowHeight);
+            item.Height(kMenuRowHeight);
+            item.Margin(Thickness{ 0, 0, 0, 0 });
             return item;
         };
 
@@ -283,7 +285,8 @@ namespace winrt::GenshinAccountSwitcher::implementation
         {
             Border line;
             line.Height(1.0);
-            line.Margin(Thickness{ 8.0, 5.0, 8.0, 5.0 });
+            line.Margin(Thickness{ 8.0, (kMenuSeparatorHeight - 1.0) / 2.0,
+                8.0, (kMenuSeparatorHeight - 1.0) / 2.0 });
             line.Background(SolidColorBrush(
                 winrt::Windows::UI::Color{ 75, 160, 160, 160 }));
             return line;
@@ -334,12 +337,12 @@ namespace winrt::GenshinAccountSwitcher::implementation
 
         // For the common short list, use unconstrained natural-height layout.
         // Only long lists introduce an account-only scrolling viewport.
-        if (count > 8)
+        if (count > kVisibleAccountRows)
         {
             ScrollViewer accountsScroll;
             accountsScroll.VerticalScrollBarVisibility(ScrollBarVisibility::Auto);
             accountsScroll.HorizontalScrollBarVisibility(ScrollBarVisibility::Disabled);
-            accountsScroll.MaxHeight(320.0);
+            accountsScroll.Height(kMenuRowHeight * kVisibleAccountRows);
             accountsScroll.Content(accountRows);
             items.Children().Append(accountsScroll);
         }
@@ -347,12 +350,12 @@ namespace winrt::GenshinAccountSwitcher::implementation
             items.Children().Append(accountRows);
 
         items.Children().Append(makeSeparator());
-        m_trayMenuExitItem = makeItem(L"退出");
-        m_trayMenuExitItem.Click([this](IInspectable const&, RoutedEventArgs const&)
+        auto exit = makeItem(L"退出");
+        exit.Click([this](IInspectable const&, RoutedEventArgs const&)
         {
             OnTrayCommand(kExitAppId);
         });
-        items.Children().Append(m_trayMenuExitItem);
+        items.Children().Append(exit);
 
         Border surface;
         surface.Width(kMenuWidth);
@@ -371,14 +374,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
         surface.Padding(Thickness{ 4.0, 4.0, 4.0, 4.0 });
         surface.Child(items);
 
-        m_trayMenuRoot = surface;
         m_trayMenuWindow.Content(surface);
-        m_trayMenuLayoutToken = surface.LayoutUpdated([this](
-            IInspectable const&, IInspectable const&)
-        {
-            if (m_trayMenuVisible && !m_trayMenuOpening)
-                AdjustTrayMenuToRenderedContent();
-        });
         RefreshTrayMenuState();
     }
 
@@ -420,67 +416,6 @@ namespace winrt::GenshinAccountSwitcher::implementation
         }
     }
 
-    void MainWindow::AdjustTrayMenuToRenderedContent()
-    {
-        if (!m_trayMenuVisible || m_trayMenuOpening || m_trayMenuSizing ||
-            !m_trayMenuRoot || !m_trayMenuExitItem || !m_trayMenuWindow)
-            return;
-
-        auto hwnd = GetWindowHandle(m_trayMenuWindow);
-        if (!hwnd || !IsWindowVisible(hwnd) ||
-            m_trayMenuExitItem.ActualHeight() < 30.0)
-            return;
-
-        try
-        {
-            // Measure the real last row relative to the explicit popup root,
-            // whose padding and border thickness are known.
-            auto bounds = m_trayMenuExitItem.TransformToVisual(m_trayMenuRoot)
-                .TransformBounds(winrt::Windows::Foundation::Rect{
-                    0, 0,
-                    static_cast<float>(m_trayMenuExitItem.ActualWidth()),
-                    static_cast<float>(m_trayMenuExitItem.ActualHeight()) });
-            const double targetDip = bounds.Y + bounds.Height +
-                m_trayMenuRoot.Padding().Bottom +
-                m_trayMenuRoot.BorderThickness().Bottom;
-            if (!std::isfinite(targetDip) || targetDip < 100.0)
-                return;
-
-            const auto dpi = GetDpiForWindow(hwnd);
-            const double scale = static_cast<double>(dpi ? dpi : 96) / 96.0;
-            auto appWindow = m_trayMenuWindow.AppWindow();
-            const int pixels = static_cast<int>(std::ceil(
-                (std::min)(targetDip, m_trayMenuAvailableHeight) * scale));
-            if (std::abs(appWindow.ClientSize().Height - pixels) <= 2)
-                return;
-
-            m_trayMenuSizing = true;
-            struct ResetFlag
-            {
-                bool& flag;
-                ~ResetFlag() { flag = false; }
-            } reset{ m_trayMenuSizing };
-
-            appWindow.ResizeClient(winrt::Windows::Graphics::SizeInt32{
-                appWindow.ClientSize().Width, pixels });
-
-            MONITORINFO monitor{};
-            monitor.cbSize = sizeof(monitor);
-            if (GetMonitorInfoW(
-                MonitorFromPoint(m_trayMenuAnchor, MONITOR_DEFAULTTONEAREST), &monitor))
-            {
-                auto size = appWindow.Size();
-                const auto& area = monitor.rcWork;
-                const int x = (std::max)(area.left,
-                    (std::min)(m_trayMenuAnchor.x, area.right - size.Width));
-                const int y = (std::max)(area.top,
-                    (std::min)(m_trayMenuAnchor.y - size.Height, area.bottom - size.Height));
-                appWindow.Move(winrt::Windows::Graphics::PointInt32{ x, y });
-            }
-        }
-        catch (...) {}
-    }
-
     void MainWindow::ShowTrayMenu()
     {
         if (!m_trayWindow || !m_initialized || m_appExiting || m_trayMenuOpening) return;
@@ -507,7 +442,6 @@ namespace winrt::GenshinAccountSwitcher::implementation
             auto monitor = MonitorFromPoint(cursor, MONITOR_DEFAULTTONEAREST);
             if (!GetMonitorInfoW(monitor, &monitorInfo)) return;
             const RECT workArea = monitorInfo.rcWork;
-            m_trayMenuAnchor = cursor;
 
             auto appWindow = m_trayMenuWindow.AppWindow();
             appWindow.Move(winrt::Windows::Graphics::PointInt32{ cursor.x, cursor.y });
@@ -516,14 +450,15 @@ namespace winrt::GenshinAccountSwitcher::implementation
             const double scale = static_cast<double>(dpi ? dpi : 96) / 96.0;
             const double availableHeight = static_cast<double>(
                 workArea.bottom - workArea.top - 16) / scale;
-            m_trayMenuAvailableHeight = availableHeight;
-            // Allocate sufficient room before any control template is realized.
-            // The layout callback then contracts to the last row's real bounds.
+            // Row height, separators, and surface insets share the same
+            // constants as the XAML elements; no post-layout resizing.
             const auto count = (std::min)(m_core.Accounts().size(), kMaxTrayAccounts);
-            const auto visibleAccounts = (std::min)(count ? count : size_t{ 1 }, size_t{ 8 });
-            const double estimatedHeight = 2.0 * 5.0 + 2.0 * 11.0 +
-                36.0 * (3.0 + static_cast<double>(visibleAccounts)) + 8.0;
-            const double desiredHeight = (std::min)(availableHeight, estimatedHeight);
+            const auto visibleAccounts = (std::min)(
+                count == 0 ? size_t{ 1 } : count, kVisibleAccountRows);
+            const double contentHeight = kMenuRowHeight *
+                (3.0 + static_cast<double>(visibleAccounts)) +
+                2.0 * kMenuSeparatorHeight + kMenuOuterVerticalInset;
+            const double desiredHeight = (std::min)(availableHeight, contentHeight);
             const int clientWidth = static_cast<int>(std::ceil(kMenuWidth * scale));
             const int clientHeight = static_cast<int>(std::ceil(
                 (std::max)(1.0, (std::min)(availableHeight, desiredHeight)) * scale));
@@ -548,8 +483,6 @@ namespace winrt::GenshinAccountSwitcher::implementation
 
             m_trayMenuDismissTimer.Start();
             RefreshTrayMenuState();
-            // Correct the window against realized item bounds after XAML layout.
-            // The initial measurement retains the proven complete-menu geometry.
         }
         catch (...)
         {
@@ -681,10 +614,6 @@ namespace winrt::GenshinAccountSwitcher::implementation
                 auto popup = self->m_trayMenuWindow;
                 self->m_trayMenuWindow = nullptr;
                 self->m_trayMenuLaunchItem = nullptr;
-                if (self->m_trayMenuRoot)
-                    self->m_trayMenuRoot.LayoutUpdated(self->m_trayMenuLayoutToken);
-                self->m_trayMenuRoot = nullptr;
-                self->m_trayMenuExitItem = nullptr;
                 self->m_trayMenuAccountItems.clear();
                 popup.Close();
             }
