@@ -402,7 +402,9 @@ namespace winrt::GenshinAccountSwitcher::implementation
         {
             auto probe = m_core.ProbeCurrent();
             auto state = ClassifyProbe(probe, false);
-            if (state.accountIndex == index && state.matchKind == gas::CurrentMatchKind::ExactCredential)
+            if (state.accountIndex == index &&
+                (state.matchKind == gas::CurrentMatchKind::ExactCredential ||
+                 state.matchKind == gas::CurrentMatchKind::UniqueUidCredentialChanged))
             {
                 RefreshTrayMenuState();
                 return;
