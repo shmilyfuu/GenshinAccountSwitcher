@@ -238,6 +238,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
                 Microsoft::UI::Dispatching::DispatcherQueueTimer const&, IInspectable const&)
             {
                 if (!m_trayMenuVisible || m_appExiting) return;
+                AdjustTrayMenuToRenderedContent();
                 auto hwnd = GetWindowHandle(m_trayMenuWindow);
                 if (!hwnd || !IsWindowVisible(hwnd) || !OwnsForeground(hwnd))
                 {
