@@ -64,6 +64,8 @@ namespace winrt::GenshinAccountSwitcher::implementation
         bool m_trayIconAdded{ false };
         bool m_trayHidden{ false };
         bool m_trayMenuVisible{ false };
+        bool m_appExiting{ false };
+        double m_trayMenuDesiredHeight{ 0.0 };
         Microsoft::UI::Xaml::Window m_trayMenuWindow{ nullptr };
         Microsoft::UI::Xaml::Controls::Button m_trayMenuLaunchButton{ nullptr };
         std::vector<Microsoft::UI::Xaml::Controls::Button> m_trayMenuAccountButtons;
@@ -115,6 +117,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
         static DWORD FindCurrentSessionGameProcessId();
         static VOID CALLBACK GameExitWaitCallback(PVOID context, BOOLEAN timedOut);
         static LRESULT CALLBACK WindowSubclassProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam, UINT_PTR subclassId, DWORD_PTR referenceData);
+        static LRESULT CALLBACK TrayPopupSubclassProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam, UINT_PTR subclassId, DWORD_PTR referenceData);
 
         winrt::fire_and_forget SettleAndReconcileAsync(bool initialPass);
         winrt::fire_and_forget AddCurrentAsync();
