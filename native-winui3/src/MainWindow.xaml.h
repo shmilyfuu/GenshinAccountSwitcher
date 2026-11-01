@@ -35,6 +35,8 @@ namespace winrt::GenshinAccountSwitcher::implementation
 
         gas::AppCore m_core;
         gas::CurrentState m_currentState;
+        gas::RegistrySnapshot m_lastRenderedSnapshot{};
+        bool m_haveRenderedSnapshot{ false };
         std::vector<AccountVisual> m_visuals;
         int m_selectedIndex{ -1 };
         bool m_initialized{ false };
@@ -69,7 +71,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
         bool m_appExiting{ false };
         Microsoft::UI::Xaml::Window m_trayMenuWindow{ nullptr };
         Microsoft::UI::Xaml::Controls::MenuFlyoutItem m_trayMenuLaunchItem{ nullptr };
-        Microsoft::UI::Xaml::Controls::MenuFlyoutPresenter m_trayMenuPresenter{ nullptr };
+        Microsoft::UI::Xaml::Controls::Border m_trayMenuRoot{ nullptr };
         Microsoft::UI::Xaml::Controls::MenuFlyoutItem m_trayMenuExitItem{ nullptr };
         winrt::event_token m_trayMenuLayoutToken{};
         bool m_trayMenuSizing{ false };
