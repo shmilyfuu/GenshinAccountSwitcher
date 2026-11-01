@@ -70,6 +70,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
         Microsoft::UI::Xaml::Controls::ScrollViewer m_trayMenuScroll{ nullptr };
         std::vector<Microsoft::UI::Xaml::Controls::ToggleMenuFlyoutItem> m_trayMenuAccountItems;
         Microsoft::UI::Dispatching::DispatcherQueueTimer m_trayMenuDismissTimer{ nullptr };
+        ULONGLONG m_trayTraceLastTick{ 0 };
 
         void ResizeWindow();
         void RefreshUi(bool rebuildAccounts = true, bool showRefreshStatus = false);
@@ -113,6 +114,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
         void HideTrayMenu();
         void BuildTrayMenu();
         void RefreshTrayMenuState();
+        void TraceTray(std::wstring const& eventName) const noexcept;
         void OnTrayCommand(UINT command);
         static DWORD FindCurrentSessionGameProcessId();
         static VOID CALLBACK GameExitWaitCallback(PVOID context, BOOLEAN timedOut);
