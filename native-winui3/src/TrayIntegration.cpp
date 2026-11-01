@@ -294,16 +294,15 @@ namespace winrt::GenshinAccountSwitcher::implementation
         if (checkedIndex != m_trayMenuCheckedIndex)
         {
             m_trayMenuCheckedIndex = checkedIndex;
-            for (size_t i = 0; i < m_trayMenuAccountItems.size(); ++i)
+            auto const& accounts = m_core.Accounts();
+            for (size_t i = 0; i < m_trayMenuAccountItems.size() && i < accounts.size(); ++i)
             {
-                if (static_cast<int>(i) == checkedIndex)
-                {
-                    SymbolIcon check;
-                    check.Symbol(Symbol::Accept);
-                    m_trayMenuAccountItems[i].Icon(check);
-                }
-                else
-                    m_trayMenuAccountItems[i].Icon(nullptr);
+                // Use visible menu text because the standalone menu presenter
+                // does not reliably paint icons assigned after construction.
+                std::wstring prefix = static_cast<int>(i) == checkedIndex
+                    ? L"✓  " : L"    ";
+                m_trayMenuAccountItems[i].Text(winrt::hstring(
+                    prefix + accounts[i].name + L"  UID " + accounts[i].uid));
             }
         }
     }
@@ -344,9 +343,12 @@ namespace winrt::GenshinAccountSwitcher::implementation
                 workArea.bottom - workArea.top - 16) / scale;
             m_trayMenuScroll.MaxHeight(availableHeight);
 
-            m_trayMenuScroll.Measure(winrt::Windows::Foundation::Size{
-                static_cast<float>(kMenuWidth), static_cast<float>(availableHeight) });
-            const double desiredHeight = m_trayMenuScroll.DesiredSize().Height;
+            // Size to the menu content. Measuring ScrollViewer itself can
+            // include unused viewport space at the bottom of the window.
+            auto menuContent = m_trayMenuScroll.Content().as<FrameworkElement>();
+            menuContent.Measure(winrt::Windows::Foundation::Size{
+                static_cast<float>(kMenuWidth), 10000.0f });
+            const double desiredHeight = menuContent.DesiredSize().Height;
             const int clientWidth = static_cast<int>(std::ceil(kMenuWidth * scale));
             const int clientHeight = static_cast<int>(std::ceil(
                 (std::max)(1.0, (std::min)(availableHeight, desiredHeight)) * scale));
