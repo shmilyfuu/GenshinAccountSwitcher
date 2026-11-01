@@ -27,6 +27,20 @@ namespace
         return SolidColorBrush(Color{ a, r, g, b });
     }
 
+    constexpr double kUidColumnWidth = 92.0;
+    constexpr double kStatusColumnWidth = 64.0;
+
+    Brush ThemeBrush(wchar_t const* key, Brush const& fallback)
+    {
+        try
+        {
+            auto candidate = Application::Current().Resources().TryLookup(box_value(key));
+            if (auto brush = candidate.try_as<Brush>()) return brush;
+        }
+        catch (...) {}
+        return fallback;
+    }
+
     Thickness MakeThickness(double l, double t, double r, double b)
     {
         return Thickness{ l, t, r, b };
@@ -139,7 +153,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
     void MainWindow::OnRefreshClick(IInspectable const&, RoutedEventArgs const&)
     {
         if (!m_initialized) return;
-        if (m_core.IsGameRunning()) RefreshUi(true, true);
+        if (m_core.IsGameRunning()) RefreshUi(false, true);
         else SettleAndReconcileAsync(false);
     }
 
@@ -272,18 +286,20 @@ namespace winrt::GenshinAccountSwitcher::implementation
         v.item = ListViewItem();
         v.item.HorizontalContentAlignment(HorizontalAlignment::Stretch);
         v.item.MinHeight(48);
+        v.item.Padding(Thickness{ 0, 0, 0, 0 });
 
         v.card = Border();
-        v.card.CornerRadius(CornerRadius{ 4 });
+        v.card.CornerRadius(CornerRadius{ 4, 4, 4, 4 });
         v.card.BorderThickness(Thickness{ 0 });
-        v.card.Padding(MakeThickness(16, 0, 12, 0));
+        v.card.Padding(MakeThickness(16, 0, 16, 0));
         v.card.Background(MakeBrush(0x00, 0, 0, 0));
 
         Grid row;
         row.Height(48);
+        row.ColumnSpacing(16);
         ColumnDefinition c0; c0.Width(GridLength{ 1, GridUnitType::Star });
-        ColumnDefinition c1; c1.Width(GridLength{ 150, GridUnitType::Pixel });
-        ColumnDefinition c2; c2.Width(GridLength{ 100, GridUnitType::Pixel });
+        ColumnDefinition c1; c1.Width(GridLength{ kUidColumnWidth, GridUnitType::Pixel });
+        ColumnDefinition c2; c2.Width(GridLength{ kStatusColumnWidth, GridUnitType::Pixel });
         row.ColumnDefinitions().Append(c0);
         row.ColumnDefinitions().Append(c1);
         row.ColumnDefinitions().Append(c2);
@@ -293,6 +309,8 @@ namespace winrt::GenshinAccountSwitcher::implementation
         name.FontSize(14);
         name.FontWeight(Windows::UI::Text::FontWeights::SemiBold());
         name.VerticalAlignment(VerticalAlignment::Center);
+        name.HorizontalAlignment(HorizontalAlignment::Left);
+        name.TextTrimming(TextTrimming::CharacterEllipsis);
         row.Children().Append(name);
 
         TextBlock uid;
@@ -300,19 +318,25 @@ namespace winrt::GenshinAccountSwitcher::implementation
         uid.FontSize(12);
         uid.Opacity(0.62);
         uid.VerticalAlignment(VerticalAlignment::Center);
+        uid.HorizontalAlignment(HorizontalAlignment::Right);
+        uid.TextAlignment(TextAlignment::Right);
+        uid.TextTrimming(TextTrimming::None);
         Grid::SetColumn(uid, 1);
         row.Children().Append(uid);
 
         v.badge = Border();
-        v.badge.CornerRadius(CornerRadius{ 4 });
-        v.badge.Padding(MakeThickness(8, 2, 8, 2));
-        v.badge.HorizontalAlignment(HorizontalAlignment::Left);
+        v.badge.CornerRadius(CornerRadius{ 4, 4, 4, 4 });
+        v.badge.Padding(MakeThickness(6, 2, 6, 2));
+        v.badge.Margin(Thickness{ 0, 0, 0, 0 });
+        v.badge.Background(ThemeBrush(L"SubtleFillColorSecondaryBrush", MakeBrush(0xFF, 0x32, 0x32, 0x32)));
+        v.badge.HorizontalAlignment(HorizontalAlignment::Right);
         v.badge.VerticalAlignment(VerticalAlignment::Center);
         v.badge.Visibility(Visibility::Collapsed);
 
         v.badgeText = TextBlock();
         v.badgeText.FontSize(11);
-        v.badgeText.Opacity(0.72);
+        v.badgeText.Opacity(1.0);
+        v.badgeText.Foreground(ThemeBrush(L"AccentTextFillColorPrimaryBrush", MakeBrush(0xFF, 0x60, 0xCD, 0xFF)));
         v.badgeText.Text(L"当前账号");
         v.badge.Child(v.badgeText);
         Grid::SetColumn(v.badge, 2);
@@ -513,7 +537,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
             if (!settled)
             {
                 m_settlementFailed = true;
-                RefreshUi(true, false);
+                RefreshUi(false, false);
                 SetStatus(L"登录状态仍在变化，本次未自动更新。可稍后使用“更多 → 刷新状态”。");
                 co_return;
             }
@@ -526,13 +550,13 @@ namespace winrt::GenshinAccountSwitcher::implementation
                 if (!BackupCredential(account))
                 {
                     m_settlementFailed = true;
-                    RefreshUi(true, false);
+                    RefreshUi(false, false);
                     SetStatus(L"无法创建上一版登录凭据备份，本次未自动更新。");
                     co_return;
                 }
 
                 auto result = m_core.UpdateAccount(finalState.accountIndex, settled->snapshot);
-                RefreshUi(true, false);
+                RefreshUi(false, false);
                 if (result.success)
                     SetStatus(L"“" + account.name + L"”的登录信息已自动更新。");
                 else
@@ -543,7 +567,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
                 co_return;
             }
 
-            RefreshUi(true, false);
+            RefreshUi(false, false);
             if (finalState.matchKind == gas::CurrentMatchKind::AmbiguousUid)
                 SetStatus(L"当前 UID 对应多条已保存记录，本次未自动更新。");
             else if (finalState.matchKind == gas::CurrentMatchKind::Inconsistent)
@@ -563,7 +587,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
         catch (...)
         {
             m_settlementFailed = true;
-            RefreshUi(true, false);
+            RefreshUi(false, false);
             SetStatus(L"自动同步登录状态时发生异常，本次未修改已保存账号。");
         }
     }
