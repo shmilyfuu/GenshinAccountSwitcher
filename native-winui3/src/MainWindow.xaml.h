@@ -63,6 +63,11 @@ namespace winrt::GenshinAccountSwitcher::implementation
         UINT m_taskbarCreatedMessage{ 0 };
         bool m_trayIconAdded{ false };
         bool m_trayHidden{ false };
+        bool m_trayMenuVisible{ false };
+        Microsoft::UI::Xaml::Window m_trayMenuWindow{ nullptr };
+        Microsoft::UI::Xaml::Controls::Button m_trayMenuLaunchButton{ nullptr };
+        std::vector<Microsoft::UI::Xaml::Controls::Button> m_trayMenuAccountButtons;
+        std::vector<Microsoft::UI::Xaml::Controls::TextBlock> m_trayMenuAccountChecks;
 
         void ResizeWindow();
         void RefreshUi(bool rebuildAccounts = true, bool showRefreshStatus = false);
@@ -103,6 +108,9 @@ namespace winrt::GenshinAccountSwitcher::implementation
         void RemoveTrayIcon();
         void HideToTray();
         void ShowTrayMenu();
+        void HideTrayMenu();
+        void BuildTrayMenu();
+        void RefreshTrayMenuState();
         void OnTrayCommand(UINT command);
         static DWORD FindCurrentSessionGameProcessId();
         static VOID CALLBACK GameExitWaitCallback(PVOID context, BOOLEAN timedOut);
