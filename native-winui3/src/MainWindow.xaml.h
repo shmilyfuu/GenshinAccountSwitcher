@@ -68,6 +68,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
         double m_trayMenuDesiredHeight{ 0.0 };
         Microsoft::UI::Xaml::Window m_trayMenuWindow{ nullptr };
         Microsoft::UI::Xaml::Controls::Button m_trayMenuLaunchButton{ nullptr };
+        Microsoft::UI::Xaml::Controls::ScrollViewer m_trayMenuAccountScroll{ nullptr };
         std::vector<Microsoft::UI::Xaml::Controls::Button> m_trayMenuAccountButtons;
         std::vector<Microsoft::UI::Xaml::Controls::TextBlock> m_trayMenuAccountChecks;
 
