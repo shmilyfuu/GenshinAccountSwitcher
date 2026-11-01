@@ -69,7 +69,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
         bool m_appExiting{ false };
         Microsoft::UI::Xaml::Window m_trayMenuWindow{ nullptr };
         Microsoft::UI::Xaml::Controls::MenuFlyoutItem m_trayMenuLaunchItem{ nullptr };
-        Microsoft::UI::Xaml::Controls::ScrollViewer m_trayMenuScroll{ nullptr };
+        Microsoft::UI::Xaml::Controls::MenuFlyoutPresenter m_trayMenuPresenter{ nullptr };
         std::vector<Microsoft::UI::Xaml::Controls::MenuFlyoutItem> m_trayMenuAccountItems;
         Microsoft::UI::Dispatching::DispatcherQueueTimer m_trayMenuDismissTimer{ nullptr };
 
