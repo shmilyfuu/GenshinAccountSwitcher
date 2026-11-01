@@ -46,6 +46,87 @@ namespace
 
 namespace winrt::GenshinAccountSwitcher::implementation
 {
+    // Temporary diagnostic trace: records window state only, never account details.
+    void MainWindow::TraceTray(std::wstring const& eventName) const noexcept
+    {
+        try
+        {
+            if (!m_initialized) return;
+            HWND popup = GetWindowHandle(m_trayMenuWindow);
+            HWND foreground = GetForegroundWindow();
+            HWND active = GetActiveWindow();
+            HWND focus = GetFocus();
+            POINT cursor{};
+            GetCursorPos(&cursor);
+            RECT bounds{};
+            if (popup) GetWindowRect(popup, &bounds);
+
+            auto handleText = [](HWND h)
+            {
+                return std::to_wstring(reinterpret_cast<std::uintptr_t>(h));
+            };
+
+            std::wstring line =
+                L"tick=" + std::to_wstring(GetTickCount64()) +
+                L" event=" + eventName +
+                L" menuFlag=" + std::to_wstring(m_trayMenuVisible) +
+                L" hiddenFlag=" + std::to_wstring(m_trayHidden) +
+                L" popupHWND=" + handleText(popup) +
+                L" popupExists=" + std::to_wstring(popup && IsWindow(popup)) +
+                L" popupVisible=" + std::to_wstring(popup && IsWindowVisible(popup)) +
+                L" appWindowVisible=" +
+                    std::to_wstring(m_trayMenuWindow && m_trayMenuWindow.AppWindow().IsVisible()) +
+                L" foreground=" + handleText(foreground) +
+                L" active=" + handleText(active) +
+                L" focus=" + handleText(focus) +
+                L" hasForeground=" + std::to_wstring(popup && OwnsForeground(popup)) +
+                L" cursor=" + std::to_wstring(cursor.x) + L"," + std::to_wstring(cursor.y) +
+                L" popupRect=" + std::to_wstring(bounds.left) + L"," +
+                    std::to_wstring(bounds.top) + L"," + std::to_wstring(bounds.right) +
+                    L"," + std::to_wstring(bounds.bottom);
+
+            struct WindowsState
+            {
+                std::wstring description;
+                DWORD pid;
+                int count;
+            } all{ L"", GetCurrentProcessId(), 0 };
+            EnumWindows([](HWND window, LPARAM data) -> BOOL
+            {
+                auto& state = *reinterpret_cast<WindowsState*>(data);
+                DWORD pid{};
+                GetWindowThreadProcessId(window, &pid);
+                if (pid != state.pid) return TRUE;
+                wchar_t className[96]{};
+                GetClassNameW(window, className, 96);
+                state.description += L" [" +
+                    std::to_wstring(reinterpret_cast<std::uintptr_t>(window)) +
+                    L",v=" + std::to_wstring(IsWindowVisible(window)) +
+                    L",class=" + className + L"]";
+                return ++state.count < 16;
+            }, reinterpret_cast<LPARAM>(&all));
+
+            line += L" processWindows=" + all.description + L"\r\n";
+            auto file = m_core.DataDirectory() / L"tray-diagnostics.log";
+            HANDLE out = CreateFileW(file.c_str(), FILE_APPEND_DATA,
+                FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_ALWAYS,
+                FILE_ATTRIBUTE_NORMAL, nullptr);
+            if (out == INVALID_HANDLE_VALUE) return;
+            int required = WideCharToMultiByte(CP_UTF8, 0, line.data(),
+                static_cast<int>(line.size()), nullptr, 0, nullptr, nullptr);
+            if (required > 0)
+            {
+                std::string utf8(static_cast<size_t>(required), '\0');
+                WideCharToMultiByte(CP_UTF8, 0, line.data(), static_cast<int>(line.size()),
+                    utf8.data(), required, nullptr, nullptr);
+                DWORD written{};
+                WriteFile(out, utf8.data(), static_cast<DWORD>(utf8.size()), &written, nullptr);
+            }
+            CloseHandle(out);
+        }
+        catch (...) {}
+    }
+
     bool MainWindow::InitializeTray()
     {
         auto hwnd = WindowHandle();
@@ -107,7 +188,9 @@ namespace winrt::GenshinAccountSwitcher::implementation
 
     void MainWindow::RestoreFromTray()
     {
+        TraceTray(L"Restore.enter");
         HideTrayMenu();
+        TraceTray(L"Restore.afterHide");
         auto hwnd = WindowHandle();
         if (!hwnd || m_appExiting) return;
         m_trayHidden = false;
@@ -115,20 +198,24 @@ namespace winrt::GenshinAccountSwitcher::implementation
         ShowWindow(hwnd, SW_SHOW);
         Activate();
         SetForegroundWindow(hwnd);
+        TraceTray(L"Restore.afterMainActivation");
         UpdateButtonStates();
     }
 
     void MainWindow::HideTrayMenu()
     {
+        TraceTray(L"Hide.enter");
         m_trayMenuVisible = false;
         if (m_trayMenuDismissTimer)
             m_trayMenuDismissTimer.Stop();
         if (m_trayMenuWindow)
         {
             m_trayMenuWindow.AppWindow().Hide();
+            TraceTray(L"Hide.afterAppWindowHide");
             if (auto hwnd = GetWindowHandle(m_trayMenuWindow))
                 ShowWindow(hwnd, SW_HIDE);
         }
+        TraceTray(L"Hide.afterWin32Hide");
     }
 
     void MainWindow::BuildTrayMenu()
@@ -161,6 +248,8 @@ namespace winrt::GenshinAccountSwitcher::implementation
             m_trayMenuWindow.Activated([this](
                 IInspectable const&, WindowActivatedEventArgs const& args)
             {
+                TraceTray(args.WindowActivationState() == WindowActivationState::Deactivated
+                    ? L"Window.Activated.deactivated" : L"Window.Activated.activated");
                 if (m_trayMenuVisible &&
                     args.WindowActivationState() == WindowActivationState::Deactivated)
                     HideTrayMenu();
@@ -173,15 +262,22 @@ namespace winrt::GenshinAccountSwitcher::implementation
                 Microsoft::UI::Dispatching::DispatcherQueueTimer const&, IInspectable const&)
             {
                 if (!m_trayMenuVisible || m_appExiting) return;
+                if (GetTickCount64() - m_trayTraceLastTick >= 1000)
+                {
+                    m_trayTraceLastTick = GetTickCount64();
+                    TraceTray(L"timer.sample");
+                }
                 auto hwnd = GetWindowHandle(m_trayMenuWindow);
                 if (!hwnd || !IsWindowVisible(hwnd) || !OwnsForeground(hwnd))
                 {
+                    TraceTray(L"timer.dismiss.visibilityOrFocus");
                     HideTrayMenu();
                     return;
                 }
 
                 if ((GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0)
                 {
+                    TraceTray(L"timer.dismiss.escape");
                     HideTrayMenu();
                     return;
                 }
@@ -194,7 +290,10 @@ namespace winrt::GenshinAccountSwitcher::implementation
                     RECT popupBounds{};
                     if (GetCursorPos(&pointer) && GetWindowRect(hwnd, &popupBounds) &&
                         !PtInRect(&popupBounds, pointer))
+                    {
+                        TraceTray(L"timer.dismiss.outsideClick");
                         HideTrayMenu();
+                    }
                 }
             });
         }
@@ -294,12 +393,14 @@ namespace winrt::GenshinAccountSwitcher::implementation
 
     void MainWindow::ShowTrayMenu()
     {
+        TraceTray(L"Show.enter");
         if (!m_trayWindow || !m_initialized || m_appExiting) return;
         if (m_trayMenuVisible) { HideTrayMenu(); return; }
 
         try
         {
             BuildTrayMenu();
+            TraceTray(L"Show.afterBuild");
             auto hwnd = GetWindowHandle(m_trayMenuWindow);
             if (!hwnd) return;
 
@@ -335,20 +436,26 @@ namespace winrt::GenshinAccountSwitcher::implementation
             const int y = (std::max)(workArea.top,
                 (std::min)(cursor.y - outerSize.Height, workArea.bottom - outerSize.Height));
             appWindow.Move(winrt::Windows::Graphics::PointInt32{ x, y });
+            TraceTray(L"Show.afterPosition");
 
             m_trayMenuWindow.Activate();
+            TraceTray(L"Show.afterActivate");
             if (!SetForegroundWindow(hwnd))
             {
+                TraceTray(L"Show.SetForegroundWindow.failed");
                 HideTrayMenu();
                 return;
             }
 
             m_trayMenuVisible = true;
+            TraceTray(L"Show.visibleFlagSet");
+            m_trayTraceLastTick = 0;
             m_trayMenuDismissTimer.Start();
             RefreshTrayMenuState();
         }
         catch (...)
         {
+            TraceTray(L"Show.exception");
             HideTrayMenu();
             if (m_trayHidden) RestoreFromTray();
             SetStatus(L"托盘菜单显示失败，请通过主窗口操作。");
@@ -357,6 +464,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
 
     void MainWindow::OnTrayCommand(UINT command)
     {
+        TraceTray(L"Command." + std::to_wstring(command));
         if (m_appExiting) return;
         if (command == kOpenPanelId) { RestoreFromTray(); return; }
         if (command == kLaunchGameId) { LaunchGameFromUi(); return; }
@@ -401,17 +509,26 @@ namespace winrt::GenshinAccountSwitcher::implementation
         auto self = reinterpret_cast<MainWindow*>(referenceData);
         if (!self) return DefSubclassProc(hwnd, message, wParam, lParam);
 
-        if (message == WM_ACTIVATE && LOWORD(wParam) == WA_INACTIVE)
-            self->HideTrayMenu();
+        if (message == WM_ACTIVATE)
+        {
+            self->TraceTray(LOWORD(wParam) == WA_INACTIVE
+                ? L"Popup.WM_ACTIVATE.inactive" : L"Popup.WM_ACTIVATE.active");
+            if (LOWORD(wParam) == WA_INACTIVE)
+                self->HideTrayMenu();
+        }
+        if (message == WM_SHOWWINDOW)
+            self->TraceTray(wParam ? L"Popup.WM_SHOWWINDOW.show" : L"Popup.WM_SHOWWINDOW.hide");
 
         if ((message == WM_KEYDOWN || message == WM_SYSKEYDOWN) && wParam == VK_ESCAPE)
         {
+            self->TraceTray(L"Popup.Escape");
             self->HideTrayMenu();
             return 0;
         }
 
         if (message == WM_CLOSE && !self->m_appExiting)
         {
+            self->TraceTray(L"Popup.WM_CLOSE");
             self->HideTrayMenu();
             return 0;
         }
@@ -452,6 +569,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
 
         if (message == WM_CLOSE && !self->m_appExiting)
         {
+            self->TraceTray(L"Main.WM_CLOSE");
             self->m_appExiting = true;
             self->HideTrayMenu();
             if (self->m_trayMenuWindow)
