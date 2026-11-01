@@ -121,7 +121,19 @@ namespace winrt::GenshinAccountSwitcher::implementation
             return;
         }
 
-        if (!m_settlementRunning) RefreshUi(false, false);
+        // A window activation should not repaint unchanged account rows.
+        // Compare the current registry identity with the last displayed one.
+        // Actual game exits and account operations already refresh explicitly.
+        if (!m_settlementRunning && m_haveRenderedSnapshot)
+        {
+            try
+            {
+                auto probe = m_core.ProbeCurrent();
+                if (!IdentitySnapshotEquals(probe.snapshot, m_lastRenderedSnapshot))
+                    RefreshUi(false, false);
+            }
+            catch (...) {}
+        }
     }
 
     void MainWindow::OnRefreshClick(IInspectable const&, RoutedEventArgs const&)
@@ -186,6 +198,8 @@ namespace winrt::GenshinAccountSwitcher::implementation
         try
         {
             auto probe = m_core.ProbeCurrent();
+            m_lastRenderedSnapshot = probe.snapshot;
+            m_haveRenderedSnapshot = true;
             bool running = m_core.IsGameRunning();
             m_currentState = ClassifyProbe(probe, running);
             auto const& accounts = m_core.Accounts();
@@ -458,9 +472,13 @@ namespace winrt::GenshinAccountSwitcher::implementation
 
         struct ResetFlag
         {
-            bool& flag;
-            ~ResetFlag() { flag = false; }
-        } reset{ m_settlementRunning };
+            MainWindow* owner;
+            ~ResetFlag()
+            {
+                owner->m_settlementRunning = false;
+                owner->UpdateButtonStates();
+            }
+        } reset{ this };
 
         try
         {
