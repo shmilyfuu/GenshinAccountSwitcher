@@ -102,6 +102,8 @@ namespace winrt::GenshinAccountSwitcher::implementation
         if (!m_trayWindow || !m_trayIconAdded) return;
         HideTrayMenu();
         m_trayHidden = true;
+        // Hide before Windows minimizes the WinUI window so its XAML
+        // content remains laid out for the next activation.
         ShowWindow(m_trayWindow, SW_HIDE);
     }
 
@@ -111,9 +113,10 @@ namespace winrt::GenshinAccountSwitcher::implementation
         auto hwnd = WindowHandle();
         if (!hwnd || m_appExiting) return;
         m_trayHidden = false;
-        ShowWindow(hwnd, SW_RESTORE);
-        ShowWindow(hwnd, SW_SHOW);
-        Activate();
+
+        // The normal tray path hides a still-restored window.
+        // Other Windows minimize actions can arrive through WM_SIZE.
+        ShowWindow(hwnd, IsIconic(hwnd) ? SW_RESTORE : SW_SHOW);
         SetForegroundWindow(hwnd);
         UpdateButtonStates();
     }
@@ -207,6 +210,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
 
         MenuFlyoutPresenter menu;
         menu.Width(kMenuWidth);
+        menu.RequestedTheme(ElementTheme::Dark);
 
         MenuFlyoutItem open;
         open.Text(L"打开面板");
@@ -259,13 +263,10 @@ namespace winrt::GenshinAccountSwitcher::implementation
         });
         menu.Items().Append(exit);
 
-        m_trayMenuScroll = ScrollViewer();
-        m_trayMenuScroll.Width(kMenuWidth);
-        m_trayMenuScroll.VerticalScrollBarVisibility(ScrollBarVisibility::Auto);
-        m_trayMenuScroll.HorizontalScrollBarVisibility(ScrollBarVisibility::Disabled);
-        m_trayMenuScroll.Content(menu);
-        m_trayMenuScroll.RequestedTheme(ElementTheme::Dark);
-        m_trayMenuWindow.Content(m_trayMenuScroll);
+        // MenuFlyoutPresenter owns its native menu ScrollViewer.
+        // Wrapping it in another ScrollViewer causes extra viewport height.
+        m_trayMenuPresenter = menu;
+        m_trayMenuWindow.Content(menu);
         RefreshTrayMenuState();
     }
 
@@ -341,14 +342,10 @@ namespace winrt::GenshinAccountSwitcher::implementation
             const double scale = static_cast<double>(dpi ? dpi : 96) / 96.0;
             const double availableHeight = static_cast<double>(
                 workArea.bottom - workArea.top - 16) / scale;
-            m_trayMenuScroll.MaxHeight(availableHeight);
-
-            // Size to the menu content. Measuring ScrollViewer itself can
-            // include unused viewport space at the bottom of the window.
-            auto menuContent = m_trayMenuScroll.Content().as<FrameworkElement>();
-            menuContent.Measure(winrt::Windows::Foundation::Size{
-                static_cast<float>(kMenuWidth), 10000.0f });
-            const double desiredHeight = menuContent.DesiredSize().Height;
+            m_trayMenuPresenter.MaxHeight(availableHeight);
+            m_trayMenuPresenter.Measure(winrt::Windows::Foundation::Size{
+                static_cast<float>(kMenuWidth), static_cast<float>(availableHeight) });
+            const double desiredHeight = m_trayMenuPresenter.DesiredSize().Height;
             const int clientWidth = static_cast<int>(std::ceil(kMenuWidth * scale));
             const int clientHeight = static_cast<int>(std::ceil(
                 (std::max)(1.0, (std::min)(availableHeight, desiredHeight)) * scale));
@@ -478,6 +475,14 @@ namespace winrt::GenshinAccountSwitcher::implementation
             return 0;
         }
 
+        // Intercept minimize before the native window enters iconic state.
+        // This prevents a one-frame blank XAML surface when restoring.
+        if (message == WM_SYSCOMMAND &&
+            (wParam & 0xFFF0) == SC_MINIMIZE && self->m_trayIconAdded)
+        {
+            self->HideToTray();
+            return 0;
+        }
         if (message == WM_SIZE && wParam == SIZE_MINIMIZED && self->m_trayIconAdded)
             self->HideToTray();
 
@@ -490,7 +495,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
                 auto popup = self->m_trayMenuWindow;
                 self->m_trayMenuWindow = nullptr;
                 self->m_trayMenuLaunchItem = nullptr;
-                self->m_trayMenuScroll = nullptr;
+                self->m_trayMenuPresenter = nullptr;
                 self->m_trayMenuAccountItems.clear();
                 popup.Close();
             }
