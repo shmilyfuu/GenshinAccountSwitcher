@@ -6,6 +6,7 @@
 #include <commctrl.h>
 #include <microsoft.ui.xaml.window.h>
 #include <winrt/Windows.System.h>
+#include <winrt/Microsoft.UI.Xaml.Input.h>
 #include <algorithm>
 
 #pragma comment(lib, "Shell32.lib")
