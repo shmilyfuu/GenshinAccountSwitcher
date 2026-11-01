@@ -359,7 +359,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
         int x = (std::max)(workArea.left, (std::min)(cursor.x, workArea.right - width));
         int y = (std::max)(workArea.top, (std::min)(cursor.y - height, workArea.bottom - height));
         SetWindowPos(hwnd, HWND_TOPMOST, x, y, width, height,
-            SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_NOSHOWWINDOW);
+            SWP_NOACTIVATE | SWP_FRAMECHANGED);
 
         m_trayMenuVisible = true;
         m_trayMenuWindow.Activate();
