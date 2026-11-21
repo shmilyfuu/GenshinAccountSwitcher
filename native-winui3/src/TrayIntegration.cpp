@@ -617,6 +617,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
                 self->m_trayMenuAccountItems.clear();
                 popup.Close();
             }
+            self->CloseFpsWorkerHandle();
             self->RemoveTrayIcon();
             Application::Current().Exit();
             return 0;
