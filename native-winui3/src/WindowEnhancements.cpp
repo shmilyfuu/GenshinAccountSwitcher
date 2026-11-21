@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "MainWindow.xaml.h"
+#include "StartupDiagnostics.h"
 #include "resource.h"
 
 #include <winrt/Microsoft.UI.Interop.h>
@@ -22,30 +23,49 @@ namespace winrt::GenshinAccountSwitcher::implementation
 {
     void MainWindow::OnRootLoaded(IInspectable const&, RoutedEventArgs const&)
     {
-        if (m_enhancementsInitialized) return;
+        gas::diagnostics::TraceStartup("RootLoaded.enter");
+        if (m_enhancementsInitialized)
+        {
+            gas::diagnostics::TraceStartup("RootLoaded.already-initialized");
+            return;
+        }
         m_enhancementsInitialized = true;
 
         try
         {
             Title(L"原神账号管理");
+            gas::diagnostics::TraceStartup("RootLoaded.configure-window.begin");
             ConfigureFixedWindow();
+            gas::diagnostics::TraceStartup("RootLoaded.configure-window.complete");
+            gas::diagnostics::TraceStartup("RootLoaded.apply-icon.begin");
             ApplyWindowIcon();
+            gas::diagnostics::TraceStartup("RootLoaded.apply-icon.complete");
+            gas::diagnostics::TraceStartup("RootLoaded.initialize-tray.begin");
             InitializeTray();
+            gas::diagnostics::TraceStartup("RootLoaded.initialize-tray.complete");
 
             if (m_monitorTimer)
             {
                 m_monitorTimer.Stop();
             }
 
+            gas::diagnostics::TraceStartup("RootLoaded.status-callback.begin");
             m_statusTextCallbackToken = StatusText().RegisterPropertyChangedCallback(
                 TextBlock::TextProperty(),
                 { this, &MainWindow::OnStatusTextPropertyChanged });
+            gas::diagnostics::TraceStartup("RootLoaded.status-callback.complete");
 
+            gas::diagnostics::TraceStartup("RootLoaded.enhanced-monitoring.begin");
             StartEnhancedMonitoring();
+            gas::diagnostics::TraceStartup("RootLoaded.enhanced-monitoring.complete");
+            gas::diagnostics::TraceStartup("RootLoaded.refresh-status.begin");
             RefreshUnifiedStatus(true);
+            gas::diagnostics::TraceStartup("RootLoaded.refresh-status.complete");
+            gas::diagnostics::TraceStartup("RootLoaded.complete");
         }
         catch (...)
         {
+            gas::diagnostics::TraceCurrentException("RootLoaded.exception");
             if (m_monitorTimer && !m_monitorTimer.IsRunning())
             {
                 m_monitorTimer.Start();
