@@ -84,7 +84,6 @@ namespace winrt::GenshinAccountSwitcher::implementation
         {
             m_core.Initialize();
             m_initialized = true;
-            InitializeFpsControls();
             m_gameWasRunning = m_core.IsGameRunning();
             m_lastObservedGameRunning = m_gameWasRunning;
             RefreshUi(true, false);
@@ -119,6 +118,22 @@ namespace winrt::GenshinAccountSwitcher::implementation
         if (m_firstActivation)
         {
             m_firstActivation = false;
+            // Window activation follows the first XAML layout. Bind FPS controls
+            // on the dispatcher afterwards so their initial value changes cannot
+            // run inside window construction or XAML prewarming.
+            DispatcherQueue().TryEnqueue([this]()
+            {
+                if (m_appExiting || m_fpsControlsReady) return;
+                try
+                {
+                    InitializeFpsControls();
+                }
+                catch (...)
+                {
+                    m_fpsEnabled = false;
+                    FpsStatusText().Text(L"帧率设置初始化失败");
+                }
+            });
             if (!m_gameWasRunning) SettleAndReconcileAsync(true);
             return;
         }
