@@ -89,6 +89,7 @@
   <ItemGroup><Manifest Include="app.manifest" /></ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
+    <ClInclude Include="StartupDiagnostics.h" />
     <ClInclude Include="NativeCore.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="App.xaml.h"><DependentUpon>App.xaml</DependentUpon></ClInclude>
@@ -101,6 +102,7 @@
   <ItemGroup>
     <ClCompile Include="pch.cpp"><PrecompiledHeader>Create</PrecompiledHeader></ClCompile>
     <ClCompile Include="NativeCore.cpp" />
+    <ClCompile Include="StartupDiagnostics.cpp" />
     <ClCompile Include="FpsIntegration.cpp" />
     <ClCompile Include="WindowEnhancements.cpp" />
     <ClCompile Include="TrayIntegration.cpp" />
