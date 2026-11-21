@@ -19,6 +19,9 @@ namespace winrt::GenshinAccountSwitcher::implementation
         void OnDeleteClick(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void OnSwitchClick(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void OnSwitchLaunchClick(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void OnFpsToggleChanged(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void OnFpsNumberChanged(IInspectable const&, Microsoft::UI::Xaml::Controls::NumberBoxValueChangedEventArgs const&);
+        void OnFpsSliderChanged(IInspectable const&, Microsoft::UI::Xaml::Controls::Primitives::RangeBaseValueChangedEventArgs const&);
         void OnRestoreClick(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void OnSelectGamePathClick(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
         void OnOpenDataDirectoryClick(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
@@ -50,6 +53,15 @@ namespace winrt::GenshinAccountSwitcher::implementation
         ULONGLONG m_launchPendingDeadline{ 0 };
         bool m_operationBusy{ false };
         int m_runtimePollTicks{ 0 };
+        bool m_fpsControlsReady{ false };
+        bool m_syncingFpsControls{ false };
+        bool m_fpsEnabled{ false };
+        int m_fpsTarget{ 120 };
+        bool m_fpsWorkerLaunchFailed{ false };
+        bool m_fpsConfigWriteFailed{ false };
+        HANDLE m_fpsWorkerProcess{ nullptr };
+        std::filesystem::path m_fpsConfigPath;
+        std::filesystem::path m_fpsStatusPath;
         Microsoft::UI::Dispatching::DispatcherQueueTimer m_monitorTimer{ nullptr };
 
         bool m_enhancementsInitialized{ false };
@@ -78,7 +90,6 @@ namespace winrt::GenshinAccountSwitcher::implementation
         winrt::event_token m_mainRenderingToken{};
         Microsoft::UI::Dispatching::DispatcherQueueTimer m_mainRevealFallback{ nullptr };
 
-        void ResizeWindow();
         void RefreshUi(bool rebuildAccounts = true, bool showRefreshStatus = false);
         gas::CurrentState ClassifyProbe(gas::CurrentProbe const& probe, bool gameRunning);
         void RebuildAccounts();
@@ -87,6 +98,12 @@ namespace winrt::GenshinAccountSwitcher::implementation
         void UpdateButtonStates();
         bool IsInteractionBlocked() const;
         void LaunchGameFromUi();
+        void InitializeFpsControls();
+        void SaveFpsSettings();
+        void UpdateFpsInputs();
+        void EnsureFpsWorkerRunning();
+        void RefreshFpsStatus();
+        void CloseFpsWorkerHandle();
         void SetStatus(std::wstring const& text);
         void StartMonitoring();
         void OnMonitorTick(Microsoft::UI::Dispatching::DispatcherQueueTimer const&, IInspectable const&);
