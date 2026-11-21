@@ -148,9 +148,9 @@
                         <ToggleSwitch x:Name="FpsToggle"
                                       Grid.Column="1"
                                       IsOn="False"
-                                      OnContent="开启"
-                                      OffContent="关闭"
-                                      VerticalAlignment="Center" />
+                                      HorizontalAlignment="Right"
+                                      VerticalAlignment="Center"
+                                      AutomationProperties.Name="帧率解锁" />
                     </Grid>
 
                     <Grid Grid.Row="1" Margin="0,4,0,0" ColumnSpacing="8">
