@@ -1,7 +1,10 @@
 #include "pch.h"
 #include "StartupDiagnostics.h"
 
+#include <algorithm>
+#include <cwchar>
 #include <exception>
+#include <iterator>
 #include <cstdio>
 #include <cstring>
 
@@ -83,6 +86,11 @@ namespace gas::diagnostics
     void TraceStartup(char const* stage) noexcept
     {
         AppendLine(stage);
+    }
+
+    void TraceHresult(char const* stage, HRESULT code, wchar_t const* message) noexcept
+    {
+        TraceWideMessage(stage, code, message);
     }
 
     void TraceCurrentException(char const* stage) noexcept
