@@ -70,6 +70,13 @@ jobs:
           Copy-Item $dll .\native-winui3\src\dist\fps-worker\UnlockerStub.dll
           Copy-Item .\fps-upstream\LICENSE .\native-winui3\src\dist\fps-worker\LICENSE-FPS-UNLOCKER.txt
 
+      - name: Include diagnostic collector
+        shell: pwsh
+        run: |
+          $dist = '.\native-winui3\src\dist'
+          Copy-Item '.\native-winui3\src\diagnostics\collect-diagnostics.cmd' $dist
+          Copy-Item '.\native-winui3\src\diagnostics\collect-diagnostics.ps1' $dist
+
       - name: Validate packaged programs
         shell: pwsh
         run: |
@@ -79,7 +86,9 @@ jobs:
             "$dist\resources.pri",
             "$dist\fps-worker\GenshinFpsWorker.exe",
             "$dist\fps-worker\UnlockerStub.dll",
-            "$dist\fps-worker\LICENSE-FPS-UNLOCKER.txt"
+            "$dist\fps-worker\LICENSE-FPS-UNLOCKER.txt",
+            "$dist\collect-diagnostics.cmd",
+            "$dist\collect-diagnostics.ps1"
           )) {
             if (!(Test-Path $file)) { throw "Missing output: $file" }
           }
