@@ -150,6 +150,12 @@ namespace winrt::GenshinAccountSwitcher::implementation
                 if (m_appExiting || m_fpsControlsReady) return;
                 try
                 {
+                    // The existing main window prewarm happens before Activate().
+                    // Realize FPS control templates only after the window is active.
+                    gas::diagnostics::TraceStartup("Fps.panel-visible.begin");
+                    FpsControlsPanel().Visibility(Visibility::Visible);
+                    gas::diagnostics::TraceStartup("Fps.panel-visible.complete");
+
                     InitializeFpsControls();
                     gas::diagnostics::TraceStartup("Window.fps-dispatch-callback.complete");
                 }
