@@ -300,6 +300,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
             SetStatus(L"未检测到游戏进程，请确认游戏是否成功启动。");
         }
         UpdateButtonStates();
+        RefreshFpsStatus();
         // The running/synchronizing state must supersede transient status text.
         RefreshUnifiedStatus(running || m_settlementRunning);
     }
