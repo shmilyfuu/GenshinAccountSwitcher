@@ -76,7 +76,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
             0,
             0,
             static_cast<LONG>(std::lround(320.0 * scale)),
-            static_cast<LONG>(std::lround(480.0 * scale))
+            static_cast<LONG>(std::lround(640.0 * scale))
         };
 
         auto exStyle = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
