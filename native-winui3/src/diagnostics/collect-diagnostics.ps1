@@ -24,8 +24,8 @@ try {
         AppPresent = (Test-Path -LiteralPath $processExe)
     }
     if (Test-Path -LiteralPath $processExe) {
-        $version.ExeSHA256 = (Get-FileHash -LiteralPath $processExe -Algorithm SHA256).Hash
-        $version.FileVersion = (Get-Item -LiteralPath $processExe).VersionInfo.FileVersion
+        $version['ExeSHA256'] = (Get-FileHash -LiteralPath $processExe -Algorithm SHA256).Hash
+        $version['FileVersion'] = (Get-Item -LiteralPath $processExe).VersionInfo.FileVersion
     }
     $version | ConvertTo-Json -Depth 4 |
         Set-Content -LiteralPath (Join-Path $tempDir 'environment.json') -Encoding UTF8
