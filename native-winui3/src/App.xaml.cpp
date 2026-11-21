@@ -20,7 +20,7 @@ namespace
         double scale = static_cast<double>(dpi) / 96.0;
         RECT rect{ 0, 0,
             static_cast<LONG>(std::lround(320.0 * scale)),
-            static_cast<LONG>(std::lround(480.0 * scale)) };
+            static_cast<LONG>(std::lround(640.0 * scale)) };
         auto exStyle = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
 
         if (AdjustWindowRectExForDpi(&rect, static_cast<DWORD>(style), FALSE,
@@ -51,8 +51,8 @@ namespace
 
         if (auto root = window.Content().try_as<FrameworkElement>())
         {
-            root.Measure(Size{ 320.0f, 480.0f });
-            root.Arrange(Rect{ 0.0f, 0.0f, 320.0f, 480.0f });
+            root.Measure(Size{ 320.0f, 640.0f });
+            root.Arrange(Rect{ 0.0f, 0.0f, 320.0f, 640.0f });
             root.UpdateLayout();
         }
     }
