@@ -127,78 +127,80 @@
                           SelectionChanged="OnAccountSelectionChanged" />
             </Grid>
 
-            <Grid Grid.Row="3" Margin="0,8,0,0">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
+            <Grid Grid.Row="3" Margin="0,8,0,0" MinHeight="144">
+                <Grid x:Name="FpsControlsPanel" Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
-                <Grid Grid.Row="0" ColumnSpacing="8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Text="帧率解锁"
-                               Style="{StaticResource BodyStrongTextBlockStyle}"
-                               VerticalAlignment="Center" />
-                    <ToggleSwitch x:Name="FpsToggle"
-                                  Grid.Column="1"
-                                  IsOn="False"
-                                  OnContent="开启"
-                                  OffContent="关闭"
-                                  VerticalAlignment="Center" />
-                </Grid>
+                    <Grid Grid.Row="0" ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="帧率解锁"
+                                   Style="{StaticResource BodyStrongTextBlockStyle}"
+                                   VerticalAlignment="Center" />
+                        <ToggleSwitch x:Name="FpsToggle"
+                                      Grid.Column="1"
+                                      IsOn="False"
+                                      OnContent="开启"
+                                      OffContent="关闭"
+                                      VerticalAlignment="Center" />
+                    </Grid>
 
-                <Grid Grid.Row="1" Margin="0,4,0,0" ColumnSpacing="8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Text="目标帧率"
-                               VerticalAlignment="Center"
-                               Style="{StaticResource BodyTextBlockStyle}" />
-                    <NumberBox x:Name="FpsNumber"
-                               Grid.Column="1"
-                               Width="104"
-                               Height="32"
-                               Minimum="1"
-                               Maximum="1000"
-                               Value="120"
-                               SpinButtonPlacementMode="Hidden"
-                               IsEnabled="False" />
-                </Grid>
+                    <Grid Grid.Row="1" Margin="0,4,0,0" ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="目标帧率"
+                                   VerticalAlignment="Center"
+                                   Style="{StaticResource BodyTextBlockStyle}" />
+                        <NumberBox x:Name="FpsNumber"
+                                   Grid.Column="1"
+                                   Width="104"
+                                   Height="32"
+                                   Minimum="1"
+                                   Maximum="1000"
+                                   Value="120"
+                                   SpinButtonPlacementMode="Hidden"
+                                   IsEnabled="False" />
+                    </Grid>
 
-                <Slider x:Name="FpsSlider"
-                        Grid.Row="2"
-                        Margin="0,0,0,0"
-                        Minimum="1"
-                        Maximum="1000"
-                        StepFrequency="1"
-                        Value="120"
-                        IsEnabled="False" />
-                <Grid Grid.Row="3" Margin="0,-5,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Text="1 FPS"
+                    <Slider x:Name="FpsSlider"
+                            Grid.Row="2"
+                            Margin="0,0,0,0"
+                            Minimum="1"
+                            Maximum="1000"
+                            StepFrequency="1"
+                            Value="120"
+                            IsEnabled="False" />
+                    <Grid Grid.Row="3" Margin="0,-5,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="1 FPS"
+                                   Style="{StaticResource CaptionTextBlockStyle}"
+                                   Opacity="0.62" />
+                        <TextBlock Grid.Column="1"
+                                   Text="1000 FPS"
+                                   Style="{StaticResource CaptionTextBlockStyle}"
+                                   Opacity="0.62" />
+                    </Grid>
+                    <TextBlock x:Name="FpsStatusText"
+                               Grid.Row="4"
+                               Margin="0,4,0,0"
+                               Text="帧率解锁已关闭"
+                               TextWrapping="Wrap"
                                Style="{StaticResource CaptionTextBlockStyle}"
-                               Opacity="0.62" />
-                    <TextBlock Grid.Column="1"
-                               Text="1000 FPS"
-                               Style="{StaticResource CaptionTextBlockStyle}"
-                               Opacity="0.62" />
+                               Opacity="0.72" />
                 </Grid>
-                <TextBlock x:Name="FpsStatusText"
-                           Grid.Row="4"
-                           Margin="0,4,0,0"
-                           Text="帧率解锁已关闭"
-                           TextWrapping="Wrap"
-                           Style="{StaticResource CaptionTextBlockStyle}"
-                           Opacity="0.72" />
             </Grid>
 
             <Grid Grid.Row="4" Margin="0,12,0,0" ColumnSpacing="8">
