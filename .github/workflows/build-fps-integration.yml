@@ -77,6 +77,34 @@ jobs:
           Copy-Item '.\native-winui3\src\diagnostics\collect-diagnostics.cmd' $dist
           Copy-Item '.\native-winui3\src\diagnostics\collect-diagnostics.ps1' $dist
 
+      - name: Smoke-test diagnostic collection
+        shell: pwsh
+        run: |
+          $dist = '.\native-winui3\src\dist'
+          $scriptPath = (Resolve-Path "$dist\collect-diagnostics.ps1").Path
+          $tokens = $null
+          $parseErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            $scriptPath, [ref]$tokens, [ref]$parseErrors) | Out-Null
+          if ($parseErrors.Count -gt 0) {
+            $parseErrors | ForEach-Object { Write-Error $_.ToString() }
+            throw 'Diagnostic collector syntax error'
+          }
+          & $scriptPath
+          $outputZip = Get-ChildItem -Path "$dist\GenshinAccountSwitcher-Diagnostic-*.zip" -File |
+            Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if (!$outputZip) { throw 'Diagnostic collector produced no ZIP' }
+          $testExtract = Join-Path $env:RUNNER_TEMP 'fps-diagnostic-test'
+          Expand-Archive -LiteralPath $outputZip.FullName -DestinationPath $testExtract -Force
+          if (!(Test-Path (Join-Path $testExtract 'environment.json'))) {
+            throw 'environment.json missing from diagnostic package'
+          }
+          if (!(Test-Path (Join-Path $testExtract 'startup.log')) -and
+              !(Test-Path (Join-Path $testExtract 'startup-log-missing.txt'))) {
+            throw 'Startup trace or missing-trace marker absent'
+          }
+          Remove-Item -LiteralPath $outputZip.FullName -Force
+
       - name: Validate packaged programs
         shell: pwsh
         run: |
