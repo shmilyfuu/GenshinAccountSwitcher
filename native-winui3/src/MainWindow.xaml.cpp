@@ -73,7 +73,6 @@ namespace winrt::GenshinAccountSwitcher::implementation
     {
         InitializeComponent();
         Title(L"原神账号切换器");
-        ResizeWindow();
 
         if (auto hwnd = WindowHandle())
         {
@@ -109,18 +108,6 @@ namespace winrt::GenshinAccountSwitcher::implementation
         Microsoft::UI::Xaml::Window window = *this;
         window.as<::IWindowNative>()->get_WindowHandle(&hwnd);
         return hwnd;
-    }
-
-    void MainWindow::ResizeWindow()
-    {
-        auto hwnd = WindowHandle();
-        if (!hwnd) return;
-        auto dpi = GetDpiForWindow(hwnd);
-        double scale = static_cast<double>(dpi) / 96.0;
-        SetWindowPos(hwnd, nullptr, 0, 0,
-            static_cast<int>(700 * scale),
-            static_cast<int>(520 * scale),
-            SWP_NOMOVE | SWP_NOZORDER);
     }
 
     void MainWindow::OnWindowActivated(IInspectable const&, WindowActivatedEventArgs const& args)
