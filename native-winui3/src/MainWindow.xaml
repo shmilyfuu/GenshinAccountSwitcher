@@ -128,7 +128,16 @@
             </Grid>
 
             <Grid Grid.Row="3" Margin="0,8,0,0" MinHeight="144">
-                <Grid x:Name="FpsControlsPanel" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Border Grid.Row="0"
+                        Background="{ThemeResource ControlStrokeColorDefaultBrush}"
+                        Height="1"
+                        Margin="0,0,0,10"
+                        Opacity="0.65" />
+                <Grid x:Name="FpsControlsPanel" Grid.Row="1" Visibility="Collapsed">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
@@ -145,12 +154,24 @@
                         <TextBlock Text="帧率解锁"
                                    Style="{StaticResource BodyStrongTextBlockStyle}"
                                    VerticalAlignment="Center" />
-                        <ToggleSwitch x:Name="FpsToggle"
-                                      Grid.Column="1"
-                                      IsOn="False"
-                                      HorizontalAlignment="Right"
-                                      VerticalAlignment="Center"
-                                      AutomationProperties.Name="帧率解锁" />
+                        <StackPanel Grid.Column="1"
+                                    Orientation="Horizontal"
+                                    Spacing="8"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center">
+                            <TextBlock x:Name="FpsToggleStateText"
+                                       Text="已关闭"
+                                       Style="{StaticResource CaptionTextBlockStyle}"
+                                       VerticalAlignment="Center"
+                                       Opacity="0.72" />
+                            <ToggleSwitch x:Name="FpsToggle"
+                                          IsOn="False"
+                                          OnContent="{x:Null}"
+                                          OffContent="{x:Null}"
+                                          HorizontalAlignment="Right"
+                                          VerticalAlignment="Center"
+                                          AutomationProperties.Name="帧率解锁" />
+                        </StackPanel>
                     </Grid>
 
                     <Grid Grid.Row="1" Margin="0,4,0,0" ColumnSpacing="8">
