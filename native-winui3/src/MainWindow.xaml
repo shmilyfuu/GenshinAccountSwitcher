@@ -149,7 +149,6 @@
                                   IsOn="False"
                                   OnContent="开启"
                                   OffContent="关闭"
-                                  Toggled="OnFpsToggleChanged"
                                   VerticalAlignment="Center" />
                 </Grid>
 
@@ -169,7 +168,7 @@
                                Maximum="1000"
                                Value="120"
                                SpinButtonPlacementMode="Hidden"
-                               ValueChanged="OnFpsNumberChanged" />
+                               IsEnabled="False" />
                 </Grid>
 
                 <Slider x:Name="FpsSlider"
@@ -179,7 +178,7 @@
                         Maximum="1000"
                         StepFrequency="1"
                         Value="120"
-                        ValueChanged="OnFpsSliderChanged" />
+                        IsEnabled="False" />
                 <Grid Grid.Row="3" Margin="0,-5,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
