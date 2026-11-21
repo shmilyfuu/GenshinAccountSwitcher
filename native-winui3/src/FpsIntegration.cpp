@@ -41,6 +41,13 @@ namespace winrt::GenshinAccountSwitcher::implementation
         }
 
         UpdateFpsInputs();
+
+        // Attach handlers only after applying the saved values to the live
+        // controls. Their first change notifications are initialization work.
+        FpsToggle().Toggled({ this, &MainWindow::OnFpsToggleChanged });
+        FpsNumber().ValueChanged({ this, &MainWindow::OnFpsNumberChanged });
+        FpsSlider().ValueChanged({ this, &MainWindow::OnFpsSliderChanged });
+
         m_fpsControlsReady = true;
         if (m_fpsEnabled) EnsureFpsWorkerRunning();
         RefreshFpsStatus();
