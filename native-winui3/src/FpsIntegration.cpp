@@ -104,6 +104,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
     {
         m_syncingFpsControls = true;
         FpsToggle().IsOn(m_fpsEnabled);
+        FpsToggleStateText().Text(m_fpsEnabled ? L"已启用" : L"已关闭");
         FpsNumber().Value(static_cast<double>(m_fpsTarget));
         FpsSlider().Value(static_cast<double>(m_fpsTarget));
         FpsNumber().IsEnabled(m_fpsEnabled);
