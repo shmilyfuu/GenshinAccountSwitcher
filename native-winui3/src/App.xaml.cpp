@@ -85,6 +85,14 @@ namespace winrt::GenshinAccountSwitcher::implementation
         {
             InitializeComponent();
             gas::diagnostics::TraceStartup("App.xaml-initialize.complete");
+            UnhandledException([](winrt::Windows::Foundation::IInspectable const&,
+                Microsoft::UI::Xaml::UnhandledExceptionEventArgs const& args)
+            {
+                gas::diagnostics::TraceHresult("Xaml.unhandled-exception",
+                    static_cast<HRESULT>(args.Exception()), args.Message().c_str());
+                // Handled remains false. The normal WinUI error behavior is retained.
+            });
+            gas::diagnostics::TraceStartup("App.xaml-unhandled-handler.registered");
         }
         catch (...)
         {
