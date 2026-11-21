@@ -148,9 +148,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
         std::error_code ec;
         std::filesystem::remove(m_fpsStatusPath, ec);
 
-        const auto arguments = L"--parent " + std::to_wstring(GetCurrentProcessId()) +
-            L" --config \"" + m_fpsConfigPath.wstring() +
-            L"\" --status \"" + m_fpsStatusPath.wstring() + L"\"";
+        const auto arguments = L"--parent " + std::to_wstring(GetCurrentProcessId());
         const auto workingDirectory = executable.parent_path().wstring();
 
         SHELLEXECUTEINFOW info{};
@@ -163,8 +161,8 @@ namespace winrt::GenshinAccountSwitcher::implementation
         info.nShow = SW_HIDE;
         info.hwnd = WindowHandle();
 
-        m_fpsWorkerLaunchFailed = !ShellExecuteExW(&info);
-        if (!m_fpsWorkerLaunchFailed && info.hProcess)
+        m_fpsWorkerLaunchFailed = !ShellExecuteExW(&info) || !info.hProcess;
+        if (!m_fpsWorkerLaunchFailed)
             m_fpsWorkerProcess = info.hProcess;
         else if (info.hProcess)
             CloseHandle(info.hProcess);
