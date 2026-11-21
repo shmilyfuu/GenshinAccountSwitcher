@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "MainWindow.xaml.h"
+#include "StartupDiagnostics.h"
 #if __has_include("MainWindow.g.cpp")
 #include "MainWindow.g.cpp"
 #endif
@@ -71,7 +72,18 @@ namespace winrt::GenshinAccountSwitcher::implementation
 {
     MainWindow::MainWindow()
     {
-        InitializeComponent();
+        gas::diagnostics::TraceStartup("MainWindow.ctor.begin");
+        gas::diagnostics::TraceStartup("MainWindow.xaml-initialize.begin");
+        try
+        {
+            InitializeComponent();
+            gas::diagnostics::TraceStartup("MainWindow.xaml-initialize.complete");
+        }
+        catch (...)
+        {
+            gas::diagnostics::TraceCurrentException("MainWindow.xaml-initialize.exception");
+            throw;
+        }
         Title(L"原神账号切换器");
 
         if (auto hwnd = WindowHandle())
@@ -82,15 +94,23 @@ namespace winrt::GenshinAccountSwitcher::implementation
 
         try
         {
+            gas::diagnostics::TraceStartup("MainWindow.core-initialize.begin");
             m_core.Initialize();
+            gas::diagnostics::TraceStartup("MainWindow.core-initialize.complete");
             m_initialized = true;
             m_gameWasRunning = m_core.IsGameRunning();
             m_lastObservedGameRunning = m_gameWasRunning;
+            gas::diagnostics::TraceStartup("MainWindow.refresh-ui.begin");
             RefreshUi(true, false);
+            gas::diagnostics::TraceStartup("MainWindow.refresh-ui.complete");
+            gas::diagnostics::TraceStartup("MainWindow.start-monitoring.begin");
             StartMonitoring();
+            gas::diagnostics::TraceStartup("MainWindow.start-monitoring.complete");
+            gas::diagnostics::TraceStartup("MainWindow.ctor.complete");
         }
         catch (...)
         {
+            gas::diagnostics::TraceCurrentException("MainWindow.ctor.core-exception");
             m_initialized = false;
             CurrentAccountText().Text(L"初始化失败");
             CurrentUidText().Text(L"UID —");
@@ -112,29 +132,41 @@ namespace winrt::GenshinAccountSwitcher::implementation
 
     void MainWindow::OnWindowActivated(IInspectable const&, WindowActivatedEventArgs const& args)
     {
+        gas::diagnostics::TraceStartup("Window.activated-event.enter");
         if (args.WindowActivationState() == WindowActivationState::Deactivated) return;
         if (!m_initialized) return;
 
         if (m_firstActivation)
         {
+            gas::diagnostics::TraceStartup("Window.first-activation.begin");
             m_firstActivation = false;
             // Window activation follows the first XAML layout. Bind FPS controls
             // on the dispatcher afterwards so their initial value changes cannot
             // run inside window construction or XAML prewarming.
+            gas::diagnostics::TraceStartup("Window.fps-dispatch-queue.begin");
             DispatcherQueue().TryEnqueue([this]()
             {
+                gas::diagnostics::TraceStartup("Window.fps-dispatch-callback.begin");
                 if (m_appExiting || m_fpsControlsReady) return;
                 try
                 {
                     InitializeFpsControls();
+                    gas::diagnostics::TraceStartup("Window.fps-dispatch-callback.complete");
                 }
                 catch (...)
                 {
+                    gas::diagnostics::TraceCurrentException("Window.fps-dispatch-callback.exception");
                     m_fpsEnabled = false;
                     FpsStatusText().Text(L"帧率设置初始化失败");
                 }
             });
-            if (!m_gameWasRunning) SettleAndReconcileAsync(true);
+            gas::diagnostics::TraceStartup("Window.fps-dispatch-queue.complete");
+            if (!m_gameWasRunning)
+            {
+                gas::diagnostics::TraceStartup("Window.initial-settlement.request");
+                SettleAndReconcileAsync(true);
+            }
+            gas::diagnostics::TraceStartup("Window.first-activation.complete");
             return;
         }
 
