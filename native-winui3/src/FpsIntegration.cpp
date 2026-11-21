@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "MainWindow.xaml.h"
+#include "StartupDiagnostics.h"
 
 #include <shellapi.h>
 #include <algorithm>
@@ -18,9 +19,11 @@ namespace winrt::GenshinAccountSwitcher::implementation
 {
     void MainWindow::InitializeFpsControls()
     {
+        gas::diagnostics::TraceStartup("Fps.initialize.begin");
         m_fpsConfigPath = m_core.DataDirectory() / L"fps-settings.json";
         m_fpsStatusPath = m_core.DataDirectory() / L"fps-worker-status.json";
 
+        gas::diagnostics::TraceStartup("Fps.config-read.begin");
         try
         {
             std::ifstream stream(m_fpsConfigPath, std::ios::binary);
@@ -36,21 +39,35 @@ namespace winrt::GenshinAccountSwitcher::implementation
         }
         catch (...)
         {
+            gas::diagnostics::TraceCurrentException("Fps.config-read.exception");
             m_fpsEnabled = false;
             m_fpsTarget = 120;
         }
+        gas::diagnostics::TraceStartup("Fps.config-read.complete");
 
+        gas::diagnostics::TraceStartup("Fps.inputs-set.begin");
         UpdateFpsInputs();
+        gas::diagnostics::TraceStartup("Fps.inputs-set.complete");
 
         // Attach handlers only after applying the saved values to the live
         // controls. Their first change notifications are initialization work.
+        gas::diagnostics::TraceStartup("Fps.handlers-register.begin");
         FpsToggle().Toggled({ this, &MainWindow::OnFpsToggleChanged });
         FpsNumber().ValueChanged({ this, &MainWindow::OnFpsNumberChanged });
         FpsSlider().ValueChanged({ this, &MainWindow::OnFpsSliderChanged });
+        gas::diagnostics::TraceStartup("Fps.handlers-register.complete");
 
         m_fpsControlsReady = true;
-        if (m_fpsEnabled) EnsureFpsWorkerRunning();
+        if (m_fpsEnabled)
+        {
+            gas::diagnostics::TraceStartup("Fps.worker-launch.begin");
+            EnsureFpsWorkerRunning();
+            gas::diagnostics::TraceStartup("Fps.worker-launch.complete");
+        }
+        gas::diagnostics::TraceStartup("Fps.status-refresh.begin");
         RefreshFpsStatus();
+        gas::diagnostics::TraceStartup("Fps.status-refresh.complete");
+        gas::diagnostics::TraceStartup("Fps.initialize.complete");
     }
 
     void MainWindow::SaveFpsSettings()
