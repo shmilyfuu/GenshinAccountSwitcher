@@ -59,6 +59,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
         int m_fpsTarget{ 120 };
         bool m_fpsWorkerLaunchFailed{ false };
         bool m_fpsConfigWriteFailed{ false };
+        std::wstring m_fpsStatus;
         HANDLE m_fpsWorkerProcess{ nullptr };
         std::filesystem::path m_fpsConfigPath;
         std::filesystem::path m_fpsStatusPath;
@@ -103,6 +104,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
         void UpdateFpsInputs();
         void EnsureFpsWorkerRunning();
         void RefreshFpsStatus();
+        void SetFpsStatus(std::wstring const& text);
         void CloseFpsWorkerHandle();
         void SetStatus(std::wstring const& text);
         void StartMonitoring();

@@ -199,13 +199,13 @@ namespace winrt::GenshinAccountSwitcher::implementation
 
         if (m_fpsConfigWriteFailed)
         {
-            FpsStatusText().Text(L"帧率设置保存失败，请检查数据目录权限");
+            SetFpsStatus(L"帧率设置保存失败，请检查数据目录权限");
             return;
         }
 
         if (!m_fpsEnabled)
         {
-            FpsStatusText().Text(m_fpsWorkerProcess && m_core.IsGameRunning()
+            SetFpsStatus(m_fpsWorkerProcess && m_core.IsGameRunning()
                 ? L"已关闭，当前游戏退出后生效"
                 : L"帧率解锁已关闭");
             return;
@@ -213,19 +213,19 @@ namespace winrt::GenshinAccountSwitcher::implementation
 
         if (m_fpsWorkerLaunchFailed)
         {
-            FpsStatusText().Text(L"帧率后台启动失败，可关闭开关后重试");
+            SetFpsStatus(L"帧率后台启动失败，可关闭开关后重试");
             return;
         }
 
         if (!m_fpsWorkerProcess)
         {
-            FpsStatusText().Text(L"帧率后台尚未启动");
+            SetFpsStatus(L"帧率后台尚未启动");
             return;
         }
 
         if (WaitForSingleObject(m_fpsWorkerProcess, 0) != WAIT_TIMEOUT)
         {
-            FpsStatusText().Text(L"帧率后台已退出，可关闭开关后重试");
+            SetFpsStatus(L"帧率后台已退出，可关闭开关后重试");
             return;
         }
 
@@ -247,6 +247,6 @@ namespace winrt::GenshinAccountSwitcher::implementation
             }
         }
         catch (...) {}
-        FpsStatusText().Text(status);
+        SetFpsStatus(status);
     }
 }

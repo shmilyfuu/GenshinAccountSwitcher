@@ -163,7 +163,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
                 {
                     gas::diagnostics::TraceCurrentException("Window.fps-dispatch-callback.exception");
                     m_fpsEnabled = false;
-                    FpsStatusText().Text(L"帧率设置初始化失败");
+                    SetFpsStatus(L"帧率设置初始化失败");
                 }
             });
             gas::diagnostics::TraceStartup("Window.fps-dispatch-queue.complete");

@@ -325,6 +325,13 @@ namespace winrt::GenshinAccountSwitcher::implementation
         RefreshUnifiedStatus(running || m_settlementRunning);
     }
 
+    void MainWindow::SetFpsStatus(std::wstring const& text)
+    {
+        if (m_fpsStatus == text) return;
+        m_fpsStatus = text;
+        RefreshUnifiedStatus(false);
+    }
+
     void MainWindow::RefreshUnifiedStatus(bool force)
     {
         if (!m_initialized)
@@ -340,7 +347,15 @@ namespace winrt::GenshinAccountSwitcher::implementation
         }
 
         m_statusOverrideUntil = 0;
-        SetUnifiedStatusText(BuildBaseStatusText());
+        auto status = BuildBaseStatusText();
+        if (!m_fpsStatus.empty() &&
+            (status == L"游戏未运行" ||
+             status == L"游戏运行中" ||
+             status == L"游戏正在运行，请完全退出后再切换账号。"))
+        {
+            status = m_fpsStatus;
+        }
+        SetUnifiedStatusText(status);
     }
 
     std::wstring MainWindow::BuildBaseStatusText() const
