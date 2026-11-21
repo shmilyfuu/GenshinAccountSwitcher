@@ -84,6 +84,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
         {
             m_core.Initialize();
             m_initialized = true;
+            InitializeFpsControls();
             m_gameWasRunning = m_core.IsGameRunning();
             m_lastObservedGameRunning = m_gameWasRunning;
             RefreshUi(true, false);
@@ -597,6 +598,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
         UpdateButtonStates();
         try
         {
+            EnsureFpsWorkerRunning();
             auto launch = m_core.LaunchGame();
             if (!launch.success)
             {
@@ -884,6 +886,7 @@ namespace winrt::GenshinAccountSwitcher::implementation
             co_return;
         }
 
+        EnsureFpsWorkerRunning();
         auto launch = m_core.LaunchGame();
         if (!launch.success)
             co_await ShowMessageAsync(L"启动失败", launch.message);
