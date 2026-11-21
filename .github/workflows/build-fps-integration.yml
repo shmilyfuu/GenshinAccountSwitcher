@@ -1,0 +1,110 @@
+name: Build FPS Integration Preview
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ feature/fps-integration ]
+    paths:
+      - 'native-winui3/src/**'
+      - 'fps-worker/**'
+      - '.github/workflows/build-fps-integration.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore native packages
+        shell: pwsh
+        working-directory: .\native-winui3\src
+        run: |
+          nuget install Microsoft.WindowsAppSDK -Version 1.7.260224002 -OutputDirectory .\packages -NonInteractive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          nuget install Microsoft.Windows.CppWinRT -Version 3.0.260715.1 -OutputDirectory .\packages -NonInteractive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          nuget install Microsoft.Windows.SDK.BuildTools -Version 10.0.26100.8249 -OutputDirectory .\packages -NonInteractive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build WinUI 3 x64 Release
+        shell: pwsh
+        working-directory: .\native-winui3\src
+        run: |
+          msbuild .\GenshinAccountSwitcherNative.sln /m /p:Configuration=Release /p:Platform=x64 /v:minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Publish headless FPS worker
+        shell: pwsh
+        run: |
+          dotnet publish .\fps-worker\GenshinFpsWorker.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:DebugType=None -o .\native-winui3\src\dist\fps-worker
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Compile upstream native unlock module
+        shell: pwsh
+        run: |
+          git clone --quiet https://github.com/34736384/genshin-fps-unlock.git .\fps-upstream
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C .\fps-upstream checkout --quiet --detach 2b85d61dd06f6e11ad86fdd6bd90339f9abc58eb
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $out = Join-Path $env:GITHUB_WORKSPACE 'fps-upstream-binaries'
+          New-Item -ItemType Directory -Path $out -Force | Out-Null
+          $outArg = "/p:OutDir=$out\"
+          msbuild .\fps-upstream\UnlockerStub\UnlockerStub.vcxproj /m /p:Configuration=Release /p:Platform=x64 $outArg /v:minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $dll = Join-Path $out 'UnlockerStub.dll'
+          if (!(Test-Path $dll)) { throw 'UnlockerStub.dll missing' }
+          Copy-Item $dll .\native-winui3\src\dist\fps-worker\UnlockerStub.dll
+          Copy-Item .\fps-upstream\LICENSE .\native-winui3\src\dist\fps-worker\LICENSE-FPS-UNLOCKER.txt
+
+      - name: Validate packaged programs
+        shell: pwsh
+        run: |
+          $dist = '.\native-winui3\src\dist'
+          foreach ($file in @(
+            "$dist\GenshinAccountSwitcher.exe",
+            "$dist\resources.pri",
+            "$dist\fps-worker\GenshinFpsWorker.exe",
+            "$dist\fps-worker\UnlockerStub.dll",
+            "$dist\fps-worker\LICENSE-FPS-UNLOCKER.txt"
+          )) {
+            if (!(Test-Path $file)) { throw "Missing output: $file" }
+          }
+          Get-ChildItem "$dist\fps-worker" -File | Select-Object Name,Length | Format-Table
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $dist = '.\native-winui3\src\dist'
+          Remove-Item "$dist\*.lib", "$dist\*.exp" -ErrorAction SilentlyContinue
+          foreach ($file in @(
+            'GenshinAccountSwitcher.exe',
+            'fps-worker\GenshinFpsWorker.exe',
+            'fps-worker\UnlockerStub.dll'
+          )) {
+            $hash = (Get-FileHash "$dist\$file" -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $file" | Add-Content -Encoding ascii "$dist\checksums.sha256"
+          }
+          Compress-Archive -Path "$dist\*" -DestinationPath .\GenshinAccountSwitcher-FPSIntegration-x64.zip -Force
+          Get-Item .\GenshinAccountSwitcher-FPSIntegration-x64.zip | Format-Table Name,Length
+
+      - name: Upload preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: GenshinAccountSwitcher-FPSIntegration-x64
+          path: .\GenshinAccountSwitcher-FPSIntegration-x64.zip
+          retention-days: 14
+          if-no-files-found: error
